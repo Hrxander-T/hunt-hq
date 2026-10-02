@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Hunt, Profile } from './types';
-import { art, pretty, natureText, TYPE_COLORS, SHINY_ODDS } from './lib';
+import { art, pretty, natureText, TYPE_COLORS } from './lib';
 
 interface Props {
   h: Hunt; people: Record<string, Profile>; me: string;
@@ -11,7 +11,6 @@ const NEXT = { planned: 'Start hunting', hunting: 'Mark caught 🎉', caught: 'B
 export default function HuntCard({ h, people, me, onBump, onStatus, onClaim, onEdit, onDelete }: Props) {
   const [armed, setArmed] = useState(false);
   const color = TYPE_COLORS[h.types[0]] ?? '#9aa8c2';
-  const odds = 1 - Math.pow(1 - 1 / SHINY_ODDS, h.attempts);
   const hunter = h.hunter_id ? people[h.hunter_id] : null;
   const adder = h.added_by ? people[h.added_by] : null;
   const tags = [['Nature', natureText(h.nature)], ['Ability', h.ability], ['IVs', h.ivs], ['Ball', h.ball]].filter(t => t[1]);
@@ -32,11 +31,6 @@ export default function HuntCard({ h, people, me, onBump, onStatus, onClaim, onE
         <button aria-label="More attempts" onClick={() => onBump(1)}>+</button>
         <small>attempts</small>
       </div>
-      {h.shiny && h.status !== 'caught' && h.attempts > 0 && (
-        <div className="odds" title="Chance of having found it by now at base odds">
-          <div style={{ width: `${Math.min(100, odds * 100)}%` }} /><span>{(odds * 100).toFixed(1)}% chance you'd have seen it by now</span>
-        </div>
-      )}
       <div className="people">
         <button className={hunter ? 'claimed' : ''} onClick={onClaim}>{hunter ? `${hunter.emoji} ${hunter.name} is on it${hunter.id === me ? ' (you)' : ''}` : "🙋 I'll hunt this"}</button>
         {adder && <small>added by {adder.name}</small>}
