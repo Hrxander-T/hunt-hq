@@ -1,5 +1,4 @@
 export interface Entry { id: number; name: string }
-export const SHINY_ODDS = 4096; // change if your games/charm use different odds
 export const NATURES: Record<string, [string, string] | null> = {
   Hardy:null,Docile:null,Serious:null,Bashful:null,Quirky:null,Lonely:['Atk','Def'],Brave:['Atk','Spe'],Adamant:['Atk','SpA'],Naughty:['Atk','SpD'],
   Bold:['Def','Atk'],Relaxed:['Def','Spe'],Impish:['Def','SpA'],Lax:['Def','SpD'],Timid:['Spe','Atk'],Hasty:['Spe','Def'],Jolly:['Spe','SpA'],Naive:['Spe','SpD'],
@@ -15,6 +14,13 @@ export const natureText = (n?: string | null) => {
 export const TYPE_COLORS: Record<string, string> = {
   normal:'#a8a77a',fire:'#ee8130',water:'#6390f0',grass:'#7ac74c',electric:'#f7d02c',ice:'#96d9d6',fighting:'#c22e28',poison:'#a33ea1',ground:'#e2bf65',
   flying:'#a98ff3',psychic:'#f95587',bug:'#a6b91a',rock:'#b6a136',ghost:'#735797',dragon:'#6f35fc',dark:'#705746',steel:'#b7b7ce',fairy:'#d685ad',
+};
+export const timeAgo = (iso: string) => {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24); return d < 7 ? `${d}d ago` : new Date(iso).toLocaleDateString();
 };
 export const pretty = (n: string) => n.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 export const art = (id: number, shiny = false) =>

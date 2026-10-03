@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
 import type { Activity, Hunt, Profile, Status } from './types';
-import { pretty } from './lib';
+import { pretty, timeAgo } from './lib';
 import HuntCard from './HuntCard';
 import HuntForm from './HuntForm';
+import AdminPanel from './AdminPanel';
+import ProfileDialog from './ProfileDialog';
 
 const NEXT: Record<Status, Status> = { planned: 'hunting', hunting: 'caught', caught: 'planned' };
 
@@ -14,12 +16,21 @@ export default function Board({ me }: { me: string }) {
   const [q, setQ] = useState(''); const [status, setStatus] = useState(''); const [sort, setSort] = useState('priority');
   const [form, setForm] = useState<{ edit?: Hunt } | null>(null);
   const [err, setErr] = useState('');
+  const [admin, setAdmin] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const [profile, setProfile] = useState(false);
 
   const load = useCallback(async () => {
+    const acc = await supabase.rpc('my_access');
+    if (acc.data && !acc.data.active) {
+      sessionStorage.setItem('hunt.notice', 'Your access has been turned off. Ask the admin if this is a mistake.');
+      supabase.auth.signOut(); return;
+    }
+    setAdmin(!!acc.data?.admin);
     const [h, p, a] = await Promise.all([
       supabase.from('hunts').select('*'),
       supabase.from('profiles').select('*'),
-      supabase.from('activity').select('*').order('created_at', { ascending: false }).limit(8),
+      supabase.from('activity').select('*').order('created_at', { ascending: false }).limit(12),
     ]);
     if (h.error) return setErr(h.error.message);
     setHunts(h.data as Hunt[]); setFeed((a.data ?? []) as Activity[]);
@@ -28,7 +39,9 @@ export default function Board({ me }: { me: string }) {
   useEffect(() => {
     load();
     const ch = supabase.channel('team').on('postgres_changes', { event: '*', schema: 'public' }, () => load()).subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const t = setInterval(load, 60000);
+    window.addEventListener('focus', load);
+    return () => { supabase.removeChannel(ch); clearInterval(t); window.removeEventListener('focus', load); };
   }, [load]);
 
   const who = people[me]?.name ?? 'Someone';
@@ -64,6 +77,8 @@ export default function Board({ me }: { me: string }) {
       <header>
         <h1>🎯 Hunt HQ</h1>
         <p>{hunts.length} on the list · {count('hunting')} being hunted · {count('caught')} caught</p>
+        <button onClick={() => setProfile(true)} title="Edit your profile">{people[me]?.emoji ?? '🎯'} {people[me]?.name ?? 'Profile'}</button>
+        {admin && <button onClick={() => setPanel(true)}>Admin</button>}
         <button onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       {err && <p className="err" onClick={() => setErr('')}>{err}</p>}
@@ -85,11 +100,23 @@ export default function Board({ me }: { me: string }) {
               onDelete={() => run(supabase.from('hunts').delete().eq('id', h.id))} />
           ))}
         </section>
-        <aside>
-          <h3>Team feed</h3>
-          {feed.length === 0 ? <p className="empty">Catches and new hunts show up here.</p> : <ul>{feed.map(a => <li key={a.id}>{a.text}</li>)}</ul>}
+        <aside className="feed">
+          <h3>Team activity</h3>
+          {feed.length === 0 ? <p className="feed-empty">Nothing yet. New hunts and catches will show up here.</p> : (
+            <ul>{feed.map(a => {
+              const u = a.user_id ? people[a.user_id] : null;
+              return (
+                <li key={a.id} className={a.text.includes('caught') ? 'win' : ''}>
+                  <span className="av">{u?.emoji ?? '🎯'}</span>
+                  <div><p>{a.text}</p><time>{timeAgo(a.created_at)}</time></div>
+                </li>
+              );
+            })}</ul>
+          )}
         </aside>
       </div>
+      {profile && <ProfileDialog me={me} current={people[me]} onClose={() => setProfile(false)} onSaved={() => { setProfile(false); load(); }} />}
+      {panel && <AdminPanel onClose={() => setPanel(false)} />}
       {form && <HuntForm initial={form.edit} onSave={save} onClose={() => setForm(null)} />}
     </div>
   );

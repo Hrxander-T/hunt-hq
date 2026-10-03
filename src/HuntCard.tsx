@@ -13,7 +13,7 @@ export default function HuntCard({ h, people, me, onBump, onStatus, onClaim, onE
   const color = TYPE_COLORS[h.types[0]] ?? '#9aa8c2';
   const hunter = h.hunter_id ? people[h.hunter_id] : null;
   const adder = h.added_by ? people[h.added_by] : null;
-  const tags = [['Nature', natureText(h.nature)], ['Ability', h.ability], ['IVs', h.ivs], ['Ball', h.ball]].filter(t => t[1]);
+  const tags = [['Nature', natureText(h.nature)], ['Ability', h.ability], ['IVs', h.ivs]].filter(t => t[1]);
   return (
     <article className={`card ${h.status}`} style={{ '--tint': color } as CSSProperties}>
       <img className="art" src={art(h.pokemon_id, h.shiny)} alt={pretty(h.name)} loading="lazy" />

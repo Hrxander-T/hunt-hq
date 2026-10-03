@@ -38,9 +38,6 @@ aside h3{margin:0 0 8px}aside ul{margin:0;padding-left:18px;font-size:.92rem}asi
 .notes{margin:0;font-size:.88rem;color:var(--mute);text-align:center;white-space:pre-wrap}
 .counter{display:flex;align-items:center;justify-content:center;gap:10px}
 .counter button{width:34px;height:34px;padding:0;font-size:1.2rem}.counter strong{font-size:1.5rem;min-width:2ch;text-align:center}.counter small{color:var(--mute)}
-.odds{position:relative;height:22px;border-radius:99px;background:var(--bg);overflow:hidden;font-size:.72rem;font-weight:700}
-.odds div{position:absolute;inset:0 auto 0 0;background:color-mix(in srgb,var(--warn) 55%,transparent)}
-.odds span{position:relative;display:block;text-align:center;line-height:22px}
 .people{display:flex;flex-direction:column;align-items:center;gap:2px}.people small{color:var(--mute)}
 .people .claimed{background:color-mix(in srgb,var(--ok) 20%,var(--card));border-color:var(--ok)}
 .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}.actions button{padding:5px 12px;font-size:.88rem}
@@ -55,3 +52,34 @@ aside h3{margin:0 0 8px}aside ul{margin:0;padding-left:18px;font-size:.92rem}asi
 .chosen{display:flex;align-items:center;gap:12px}.chosen img{width:96px;height:96px}
 @media(max-width:820px){.layout{grid-template-columns:1fr}aside{position:static}.grid2{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.sheet table{width:100%;border-collapse:collapse;font-size:.9rem}.sheet td{padding:6px 4px;border-bottom:1px solid var(--line)}.sheet td small{color:var(--mute)}
+.code{font-family:ui-monospace,monospace;letter-spacing:.08em;font-weight:800}.sheet h3{margin:6px 0 0}
+
+/* Hunt form */
+.hf h4{margin:0 0 8px;font-size:.95rem}
+.hf section{display:grid;gap:10px}
+.hint{color:var(--mute);font-size:.88rem;margin:0}
+.banner{display:flex;align-items:center;gap:14px;border-radius:20px;padding:10px 16px;background:linear-gradient(135deg,color-mix(in srgb,var(--tint) 35%,var(--card)),var(--card))}
+.banner img{width:96px;height:96px;object-fit:contain;filter:drop-shadow(0 6px 6px rgba(0,0,0,.2))}
+.banner strong{font-size:1.3rem;display:block}.banner .chips{justify-content:flex-start;margin:4px 0}
+.seg{display:flex;gap:4px;background:var(--bg);border-radius:999px;padding:3px}
+.seg.wrap{flex-wrap:wrap;border-radius:16px}
+.seg button{border:0;background:none;flex:1;padding:6px 10px;font-size:.85rem;white-space:nowrap}
+.seg button.on{background:var(--brand);color:#fff}
+.switch{display:flex!important;flex-direction:row!important;align-items:center;gap:10px;color:var(--ink)!important;cursor:pointer}
+.switch input{position:absolute;opacity:0;width:0}
+.switch .track{width:44px;height:26px;border-radius:99px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.switch .track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch input:checked+.track{background:var(--warn)}.switch input:checked+.track::after{transform:translateX(18px)}
+.switch input:focus-visible+.track{outline:3px solid var(--brand);outline-offset:2px}
+.foot{position:sticky;bottom:-22px;display:flex;justify-content:flex-end;gap:8px;background:var(--card);padding:12px 0 2px}
+.emojis{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}.emojis button{padding:6px 0;font-size:1.3rem;border-radius:12px}.emojis button.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 15%,var(--card))}
+/* Team activity */
+aside.feed h3{margin:0 0 12px}
+aside.feed ul{list-style:none;padding:0;margin:0;display:grid;gap:12px;font-size:.9rem}
+aside.feed li{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:14px}
+aside.feed li.win{background:color-mix(in srgb,var(--ok) 14%,var(--card))}
+aside.feed .av{width:32px;height:32px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none}
+aside.feed p{margin:0}aside.feed time{color:var(--mute);font-size:.78rem}
+.feed-empty{color:var(--mute);font-size:.9rem;margin:0}

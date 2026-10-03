@@ -4,6 +4,7 @@ create table profiles (
   name text not null,
   emoji text not null default '🎯'
 );
+create unique index profiles_name_unique on profiles (lower(name));
 create table hunts (
   id uuid primary key default gen_random_uuid(),
   pokemon_id int not null,
@@ -27,8 +28,13 @@ create table activity (
 
 -- Create a profile automatically on first sign-in (name = part of email before @).
 create function handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+declare base text := coalesce(nullif(trim(new.raw_user_meta_data->>'username'), ''), split_part(new.email, '@', 1));
 begin
-  insert into profiles (id, name) values (new.id, split_part(new.email, '@', 1));
+  begin
+    insert into profiles (id, name) values (new.id, base);
+  exception when unique_violation then
+    insert into profiles (id, name) values (new.id, base || '-' || substr(new.id::text, 1, 4));
+  end;
   return new;
 end $$;
 create trigger on_auth_user_created after insert on auth.users for each row execute function handle_new_user();
