@@ -1,4 +1,8 @@
+import type { IvReq, IvReqs, StatKey } from './types';
 export interface Entry { id: number; name: string }
+export const STATS: [StatKey, string][] = [['hp', 'HP'], ['atk', 'Atk'], ['def', 'Def'], ['spa', 'SpA'], ['spd', 'SpD'], ['spe', 'Spe']];
+export const ivLabel = (r: IvReq) => (r.op === 'eq' ? `${r.v}` : r.op === 'min' ? `${r.v}+` : `${r.v}\u2212`);
+export const ivSummary = (iv: IvReqs) => STATS.filter(([k]) => iv[k]).map(([k, l]) => `${l} ${ivLabel(iv[k]!)}`);
 export const NATURES: Record<string, [string, string] | null> = {
   Hardy:null,Docile:null,Serious:null,Bashful:null,Quirky:null,Lonely:['Atk','Def'],Brave:['Atk','Spe'],Adamant:['Atk','SpA'],Naughty:['Atk','SpD'],
   Bold:['Def','Atk'],Relaxed:['Def','Spe'],Impish:['Def','SpA'],Lax:['Def','SpD'],Timid:['Spe','Atk'],Hasty:['Spe','Def'],Jolly:['Spe','SpA'],Naive:['Spe','SpD'],

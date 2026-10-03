@@ -7,6 +7,7 @@ export default function Auth() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [msg, setMsg] = useState(sessionStorage.getItem('hunt.notice') ?? '');
   const [busy, setBusy] = useState(false);
 
@@ -28,23 +29,42 @@ export default function Auth() {
   };
 
   return (
-    <main className="auth">
-      <div className="logo">🎯</div>
-      <h1>Hunt HQ</h1>
-      <p>{mode === 'in' ? 'Sign in to your account.' : 'Create your account with the invite code you were sent.'}</p>
-      <form onSubmit={submit}>
-        {mode === 'join' && <>
-          <input required placeholder="Invite code" value={code} onChange={e => setCode(e.target.value)} autoCapitalize="characters" />
-          <input required minLength={2} maxLength={24} placeholder="Choose a username" value={username} onChange={e => setUsername(e.target.value)} />
-        </>}
-        <input type="email" required placeholder="you@team.com" value={email} onChange={e => setEmail(e.target.value)} />
-        <input type="password" required minLength={mode === 'join' ? 8 : 1} placeholder={mode === 'join' ? 'Choose a password (8+ characters)' : 'Password'} value={password} onChange={e => setPassword(e.target.value)} />
-        <button className="primary" disabled={busy}>{busy ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
-        {msg && <p className="err">{msg}</p>}
-      </form>
-      <button type="button" className="ghost" onClick={() => { setMode(mode === 'in' ? 'join' : 'in'); setMsg(''); }}>
-        {mode === 'in' ? 'I have an invite code' : 'Back to sign in'}
-      </button>
+    <main className="authwrap">
+      <section className="authbrand">
+        <span className="mark big" aria-hidden="true" />
+        <h1>Hunt HQ</h1>
+        <p>One shared list for every Pokémon your team is hunting.</p>
+        <ul>
+          <li>Natures, abilities and IV requirements for each target</li>
+          <li>See who is hunting what</li>
+          <li>Everyone stays on the same page</li>
+        </ul>
+      </section>
+      <section className="authcard">
+        <div className="seg" role="tablist">
+          <button type="button" className={mode === 'in' ? 'on' : ''} onClick={() => { setMode('in'); setMsg(''); }}>Sign in</button>
+          <button type="button" className={mode === 'join' ? 'on' : ''} onClick={() => { setMode('join'); setMsg(''); }}>Use invite code</button>
+        </div>
+        <form onSubmit={submit}>
+          {mode === 'join' && <>
+            <label className="field"><span className="lbl">Invite code</span>
+              <input required value={code} onChange={e => setCode(e.target.value)} autoCapitalize="characters" autoComplete="off" /></label>
+            <label className="field"><span className="lbl">Username</span>
+              <input required minLength={2} maxLength={24} value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" /></label>
+          </>}
+          <label className="field"><span className="lbl">Email</span>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
+          <label className="field"><span className="lbl">{mode === 'join' ? 'Choose a password' : 'Password'}</span>
+            <span className="pw">
+              <input type={show ? 'text' : 'password'} required minLength={mode === 'join' ? 8 : 1} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'join' ? 'new-password' : 'current-password'} />
+              <button type="button" className="ghost" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button>
+            </span>
+            {mode === 'join' && <small className="hint">At least 8 characters.</small>}
+          </label>
+          {msg && <p className="err" role="alert">{msg}</p>}
+          <button className="primary wide" disabled={busy}>{busy ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</button>
+        </form>
+      </section>
     </main>
   );
 }
