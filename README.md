@@ -30,3 +30,6 @@ Everyone has their own account. You (the admin) create one-time invite codes in 
 3. Deploy the edge function: `supabase functions deploy redeem-invite --no-verify-jwt` (or paste `supabase/functions/redeem-invite/index.ts` into Dashboard > Edge Functions). No extra secrets needed.
 4. Keep "Allow new users to sign up" OFF in Supabase. Accounts are created only through invite codes.
 5. Forgot a password? Authentication > Users > the user > Send password recovery, or set a new one there.
+
+## Caught history
+Run `supabase/migration-caught.sql` once (after `migration-v2.sql`). Members paste Pokémon Showdown sets on the Caught tab; entries can be linked to a hunt (which raises that hunt's caught count), receive reactions, and be approved by the admin when they meet the hunt's requirements.

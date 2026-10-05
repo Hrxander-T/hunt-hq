@@ -4,12 +4,12 @@ import { art, pretty, TYPE_COLORS, ivSummary, natureText } from './lib';
 import Avatar from './Avatar';
 
 interface Props {
-  h: Hunt; people: Record<string, Profile>; me: string;
+  h: Hunt; people: Record<string, Profile>; me: string; caught?: { n: number; approved: number };
   onStatus: () => void; onClaim: () => void; onEdit: () => void; onDelete: () => void;
 }
 const NEXT = { planned: 'Start hunting', hunting: 'Mark as caught', caught: 'Move back to planned' } as const;
 
-export default function HuntCard({ h, people, me, onStatus, onClaim, onEdit, onDelete }: Props) {
+export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onEdit, onDelete }: Props) {
   const [armed, setArmed] = useState(false);
   const hunter = h.hunter_id ? people[h.hunter_id] : null;
   const adder = h.added_by ? people[h.added_by] : null;
@@ -18,6 +18,7 @@ export default function HuntCard({ h, people, me, onStatus, onClaim, onEdit, onD
   if (h.natures?.length) specs.push(['Nature', h.natures.map(natureText).join(', ')]);
   if (h.abilities?.length) specs.push(['Ability', h.abilities.join(', ')]);
   if (iv.length) specs.push(['IVs', iv.join('  ·  ')]);
+  if (caught && caught.n > 0) specs.push(['Caught', caught.approved ? `${caught.n} (${caught.approved} approved)` : `${caught.n}`]);
 
   return (
     <article className={`card ${h.status}`} style={{ '--tint': TYPE_COLORS[h.types[0]] ?? '#9aa8c2' } as CSSProperties}>

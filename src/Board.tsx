@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
-import type { Hunt, Profile, Status } from './types';
+import type { Caught, Hunt, Profile, Reaction, Status } from './types';
 import HuntCard from './HuntCard';
 import HuntForm from './HuntForm';
 import AdminPanel from './AdminPanel';
 import ProfileDialog from './ProfileDialog';
 import Avatar from './Avatar';
+import CaughtList from './CaughtList';
 
 const NEXT: Record<Status, Status> = { planned: 'hunting', hunting: 'caught', caught: 'planned' };
 const fields = (d: Partial<Hunt>) => ({
@@ -22,6 +23,9 @@ export default function Board({ me }: { me: string }) {
   const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState(false);
   const [profile, setProfile] = useState(false);
+  const [tab, setTab] = useState<'hunts' | 'caught'>('hunts');
+  const [caught, setCaught] = useState<Caught[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
 
   const load = useCallback(async () => {
     const acc = await supabase.rpc('my_access');
@@ -30,9 +34,13 @@ export default function Board({ me }: { me: string }) {
       supabase.auth.signOut(); return;
     }
     setAdmin(!!acc.data?.admin);
-    const [h, p] = await Promise.all([supabase.from('hunts').select('*'), supabase.from('profiles').select('*')]);
+    const [h, p, c, r] = await Promise.all([
+      supabase.from('hunts').select('*'), supabase.from('profiles').select('*'),
+      supabase.from('caught').select('*').order('created_at', { ascending: false }), supabase.from('caught_reactions').select('*'),
+    ]);
     if (h.error) return setErr(h.error.message);
-    setHunts(h.data as Hunt[]);
+    if (c.error) setErr('Caught history: ' + c.error.message);
+    setHunts(h.data as Hunt[]); setCaught((c.data ?? []) as Caught[]); setReactions((r.data ?? []) as Reaction[]);
     setPeople(Object.fromEntries(((p.data ?? []) as Profile[]).map(x => [x.id, x])));
   }, []);
   useEffect(() => {
@@ -63,13 +71,18 @@ export default function Board({ me }: { me: string }) {
   }, [hunts, people, q, status, sort]);
 
   const count = (s: Status) => hunts.filter(h => h.status === s).length;
+  const counts = useMemo(() => {
+    const m = new Map<string, { n: number; approved: number }>();
+    for (const c of caught) if (c.hunt_id) { const x = m.get(c.hunt_id) ?? { n: 0, approved: 0 }; x.n++; if (c.approved) x.approved++; m.set(c.hunt_id, x); }
+    return m;
+  }, [caught]);
   const myName = people[me]?.name ?? 'Profile';
   return (
     <div className="wrap">
       <header className="appbar">
         <div className="brand">
           <span className="mark" aria-hidden="true" />
-          <div><h1>Hunt HQ</h1><p>{hunts.length} on the list · {count('hunting')} active · {count('caught')} caught</p></div>
+          <div><h1>Hunt HQ</h1><p>{hunts.length} on the list · {count('hunting')} active · {count('caught')} done</p></div>
         </div>
         <div className="acct">
           <button className="user" onClick={() => setProfile(true)} title="Edit your profile"><Avatar name={myName} size={24} /><span>{myName}</span></button>
@@ -78,6 +91,11 @@ export default function Board({ me }: { me: string }) {
         </div>
       </header>
       {err && <p className="err" onClick={() => setErr('')}>{err}</p>}
+      <div className="seg tabs" role="tablist">
+        <button className={tab === 'hunts' ? 'on' : ''} onClick={() => setTab('hunts')}>Hunts</button>
+        <button className={tab === 'caught' ? 'on' : ''} onClick={() => setTab('caught')}>Caught ({caught.length})</button>
+      </div>
+      {tab === 'caught' ? <CaughtList caught={caught} hunts={hunts} people={people} reactions={reactions} me={me} admin={admin} onChanged={load} /> : <>
       <div className="bar">
         <input type="search" placeholder="Search Pokémon, nature, ability, hunter" value={q} onChange={e => setQ(e.target.value)} aria-label="Search" />
         <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by status"><option value="">All statuses</option><option value="planned">Planned</option><option value="hunting">Hunting</option><option value="caught">Caught</option></select>
@@ -87,13 +105,14 @@ export default function Board({ me }: { me: string }) {
       <section className="cards">
         {shown.length === 0 && <p className="empty">{hunts.length ? 'Nothing matches that filter.' : 'The list is empty. Add the first Pokémon your team wants to hunt.'}</p>}
         {shown.map(h => (
-          <HuntCard key={h.id} h={h} people={people} me={me}
+          <HuntCard key={h.id} h={h} people={people} me={me} caught={counts.get(h.id)}
             onStatus={() => run(supabase.from('hunts').update({ status: NEXT[h.status] }).eq('id', h.id))}
             onClaim={() => run(supabase.from('hunts').update({ hunter_id: h.hunter_id === me ? null : me }).eq('id', h.id))}
             onEdit={() => setForm({ edit: h })}
             onDelete={() => run(supabase.from('hunts').delete().eq('id', h.id))} />
         ))}
       </section>
+      </>}
       {profile && <ProfileDialog me={me} current={people[me]} onClose={() => setProfile(false)} onSaved={() => { setProfile(false); load(); }} />}
       {panel && <AdminPanel onClose={() => setPanel(false)} />}
       {form && <HuntForm initial={form.edit} onSave={save} onClose={() => setForm(null)} />}

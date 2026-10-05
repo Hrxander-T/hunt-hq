@@ -27,6 +27,8 @@ export const timeAgo = (iso: string) => {
   const d = Math.floor(h / 24); return d < 7 ? `${d}d ago` : new Date(iso).toLocaleDateString();
 };
 export const pretty = (n: string) => n.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+export const sprite = (id: number, shiny = false) =>
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shiny ? 'shiny/' : ''}${id}.png`;
 export const art = (id: number, shiny = false) =>
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${shiny ? 'shiny/' : ''}${id}.png`;
 
