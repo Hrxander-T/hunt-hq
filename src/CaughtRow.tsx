@@ -4,6 +4,7 @@ import type { Caught, Hunt, Profile, Reaction } from './types';
 import { pretty, sprite, STATS, TYPE_COLORS } from './lib';
 import { checkReqs, hiddenPower, ivTotal } from './paste';
 import Avatar from './Avatar';
+import ReqMatch, { ReqSummary } from './ReqMatch';
 
 const KINDS: [string, string][] = [['congrats', 'Congrats'], ['ivs', 'Great IVs'], ['wow', 'Wow']];
 export interface RowProps {
@@ -43,13 +44,13 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
         </span>
         <span className="hpw" title="Hidden Power type">{hp ?? ''}</span>
         <span className="by">{owner?.name ?? ''}</span>
-        <span className={`st${c.approved ? ' ok' : ''}`}>{c.approved ? 'Approved' : 'Pending'}{reactions.length > 0 && ` · ${reactions.length}`}</span>
+        <span className={`st${c.approved ? ' ok' : chk && !chk.ok ? ' bad' : ''}`}>{c.approved ? 'Approved' : chk && !chk.ok ? `${chk.count} ${chk.count === 1 ? 'miss' : 'misses'}` : 'Pending'}{reactions.length > 0 && ` · ${reactions.length}`}</span>
       </button>
       {open && (
         <div className="cdetail">
           <div className="dgrid">
             <div><span className="lbl">Submitted by</span><span className="who">{owner && <Avatar name={owner.name} size={20} />}{owner?.name ?? 'Unknown'} · {new Date(c.created_at).toLocaleDateString()}</span></div>
-            {hunt && chk && <div><span className="lbl">Linked hunt</span>{chk.ok ? <span className="okmsg">Meets all requirements</span> : <span className="warn">Misses: {chk.misses.join('; ')}</span>}</div>}
+            {hunt && chk && <div className="span2"><span className="lbl">Linked hunt: {pretty(hunt.name)} <ReqSummary r={chk} /></span><ReqMatch c={c} h={hunt} r={chk} /></div>}
             <div><span className="lbl">React</span>
               <span className="reacts">{KINDS.map(([k, label]) => {
                 const n = reactions.filter(r => r.kind === k).length, mine = reactions.some(r => r.user_id === me && r.kind === k);

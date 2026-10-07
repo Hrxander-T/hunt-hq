@@ -1,4 +1,4 @@
-import type { Caught, Hunt, StatKey } from './types';
+import type { Caught, Hunt, IvReq, StatKey } from './types';
 import { ivLabel, NATURES, STATS, type Entry } from './lib';
 
 type Stats = Partial<Record<StatKey, number>>;
@@ -74,20 +74,29 @@ export function hiddenPower(c: Pick<Caught, 'ivs' | 'moves'>): string | null {
   return HP_TYPES[Math.floor((n * 15) / 63)];
 }
 
-// Does a catch satisfy a hunt's nature / ability / IV / shiny requirements?
-export function checkReqs(c: Pick<Caught, 'nature' | 'ability' | 'shiny' | 'ivs'>, h: Hunt) {
+// Does a catch satisfy a hunt's nature / ability / IV / shiny requirements? Returns per-item results for display.
+type Mark = 'na' | 'ok' | 'miss';
+export interface ReqResult {
+  ok: boolean; count: number; misses: string[]; nature: Mark; ability: Mark; shiny: Mark;
+  stats: Partial<Record<StatKey, { ok: boolean; req: IvReq }>>;
+}
+export function checkReqs(c: Pick<Caught, 'nature' | 'ability' | 'shiny' | 'ivs'>, h: Hunt): ReqResult {
   const misses: string[] = [];
   const low = (s: string | null) => (s ?? '').toLowerCase();
-  if (h.natures?.length && !h.natures.some(n => low(n) === low(c.nature))) misses.push(`Nature ${c.nature ?? 'unknown'} is not on the list`);
-  if (h.abilities?.length && !h.abilities.some(a => low(a) === low(c.ability))) misses.push(`Ability ${c.ability ?? 'unknown'} is not on the list`);
+  const nature: Mark = !h.natures?.length ? 'na' : h.natures.some(n => low(n) === low(c.nature)) ? 'ok' : 'miss';
+  const ability: Mark = !h.abilities?.length ? 'na' : h.abilities.some(a => low(a) === low(c.ability)) ? 'ok' : 'miss';
+  const shiny: Mark = !h.shiny ? 'na' : c.shiny ? 'ok' : 'miss';
+  if (nature === 'miss') misses.push(`Nature ${c.nature ?? 'unknown'} is not on the list`);
+  if (ability === 'miss') misses.push(`Ability ${c.ability ?? 'unknown'} is not on the list`);
+  if (shiny === 'miss') misses.push('Not shiny');
+  const stats: ReqResult['stats'] = {};
   for (const [k, label] of STATS) {
     const r = h.iv_reqs?.[k];
     if (!r) continue;
     const v = c.ivs?.[k];
-    if (v === undefined) { misses.push(`${label} unknown`); continue; }
-    const ok = r.op === 'eq' ? v === r.v : r.op === 'min' ? v >= r.v : v <= r.v;
-    if (!ok) misses.push(`${label} ${v} (needs ${ivLabel(r)})`);
+    const ok = v !== undefined && (r.op === 'eq' ? v === r.v : r.op === 'min' ? v >= r.v : v <= r.v);
+    stats[k] = { ok, req: r };
+    if (!ok) misses.push(`${label} ${v ?? 'unknown'} (needs ${ivLabel(r)})`);
   }
-  if (h.shiny && !c.shiny) misses.push('Not shiny');
-  return { ok: misses.length === 0, misses };
+  return { ok: misses.length === 0, count: misses.length, misses, nature, ability, shiny, stats };
 }

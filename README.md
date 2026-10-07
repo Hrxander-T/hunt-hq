@@ -33,3 +33,6 @@ Everyone has their own account. You (the admin) create one-time invite codes in 
 
 ## Caught history
 Run `supabase/migration-caught.sql` once (after `migration-v2.sql`). Members paste Pokémon Showdown sets on the Caught tab; entries can be linked to a hunt (which raises that hunt's caught count), receive reactions, and be approved by the admin when they meet the hunt's requirements.
+
+## Quantity targets and hunt catches
+Run `supabase/migration-target.sql` once. Each hunt has a quantity needed; the Catches button lists linked catches and unlinked catches of the same Pokémon that you can link.

@@ -2,14 +2,15 @@ import { useState, type CSSProperties } from 'react';
 import type { Hunt, Profile } from './types';
 import { art, pretty, TYPE_COLORS, ivSummary, natureText } from './lib';
 import Avatar from './Avatar';
+import type { HuntCounts } from './HuntRow';
 
 interface Props {
-  h: Hunt; people: Record<string, Profile>; me: string; caught?: { n: number; approved: number };
-  onStatus: () => void; onClaim: () => void; onEdit: () => void; onDelete: () => void;
+  h: Hunt; people: Record<string, Profile>; me: string; caught?: HuntCounts;
+  onStatus: () => void; onClaim: () => void; onEdit: () => void; onDelete: () => void; onCatches: () => void;
 }
 const NEXT = { planned: 'Start hunting', hunting: 'Mark as caught', caught: 'Move back to planned' } as const;
 
-export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onEdit, onDelete }: Props) {
+export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onEdit, onDelete, onCatches }: Props) {
   const [armed, setArmed] = useState(false);
   const hunter = h.hunter_id ? people[h.hunter_id] : null;
   const adder = h.added_by ? people[h.added_by] : null;
@@ -18,7 +19,7 @@ export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onE
   if (h.natures?.length) specs.push(['Nature', h.natures.map(natureText).join(', ')]);
   if (h.abilities?.length) specs.push(['Ability', h.abilities.join(', ')]);
   if (iv.length) specs.push(['IVs', iv.join('  ·  ')]);
-  if (caught && caught.n > 0) specs.push(['Caught', caught.approved ? `${caught.n} (${caught.approved} approved)` : `${caught.n}`]);
+  const n = caught?.n ?? 0, linked = caught?.linked ?? 0, target = h.target ?? 1, done = n >= target;
 
   return (
     <article className={`card ${h.status}`} style={{ '--tint': TYPE_COLORS[h.types[0]] ?? '#9aa8c2' } as CSSProperties}>
@@ -35,6 +36,12 @@ export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onE
         </div>
       </div>
       {specs.length > 0 && <dl className="specs">{specs.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
+      {(target > 1 || linked > 0) && (
+        <div className="prog" title="Linked catches that meet the requirements, out of the quantity needed">
+          <div className="meter"><div className={done ? 'full' : ''} style={{ width: `${Math.min(100, (n / target) * 100)}%` }} /></div>
+          <span>{n} of {target} matching{caught?.approved ? ` · ${caught.approved} approved` : ''}{linked > n ? ` · ${linked - n} not matching` : ''}{done ? ' · target reached' : ''}</span>
+        </div>
+      )}
       {h.notes && <p className="notes">{h.notes}</p>}
       <div className="people">
         {hunter ? <span className="who"><Avatar name={hunter.name} size={22} /> {hunter.id === me ? 'You are hunting this' : `${hunter.name} is hunting this`}</span>
@@ -42,7 +49,8 @@ export default function HuntCard({ h, people, me, caught, onStatus, onClaim, onE
         {(!hunter || hunter.id === me) && <button className="ghost small" onClick={onClaim}>{hunter ? 'Release' : 'Claim'}</button>}
       </div>
       <div className="actions">
-        <button className="primary" onClick={onStatus}>{NEXT[h.status]}</button>
+        <button className="primary" onClick={onStatus}>{done && h.status !== 'caught' ? 'Mark as caught' : NEXT[h.status]}</button>
+        <button onClick={onCatches}>Catches{linked > 0 ? ` (${linked})` : ''}</button>
         <button onClick={onEdit}>Edit</button>
         <button className="ghost" onClick={() => { if (armed) onDelete(); else { setArmed(true); setTimeout(() => setArmed(false), 3500); } }}>{armed ? 'Confirm delete' : 'Delete'}</button>
       </div>

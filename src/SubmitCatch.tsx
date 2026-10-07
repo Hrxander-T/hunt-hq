@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import type { Caught, Hunt } from './types';
 import { art, details, loadList, pretty, STATS, type Entry } from './lib';
 import { checkReqs, findSpecies, parsePaste } from './paste';
+import ReqMatch, { ReqSummary } from './ReqMatch';
 
 interface Props { hunts: Hunt[]; editing?: Caught; onClose: () => void; onDone: () => void }
 
@@ -28,7 +29,7 @@ export default function SubmitCatch({ hunts, editing, onClose, onDone }: Props) 
     const link = links[i] !== undefined ? links[i] : suggested?.id ?? '';
     const hunt = options.find(h => h.id === link);
     const check = hunt ? checkReqs({ nature: p.nature ?? null, ability: p.ability ?? null, shiny: p.shiny, ivs: p.ivs }, hunt) : null;
-    return { p, e, options, link, check };
+    return { p, e, options, link, check, hunt };
   }), [text, list, fix, links, hunts, editing]);
 
   const ready = rows.length > 0 && rows.every(r => r.e);
@@ -77,7 +78,7 @@ export default function SubmitCatch({ hunts, editing, onClose, onDone }: Props) 
             )}
             {r.p.warnings.map(w => <p key={w} className="warn">{w}</p>)}
             {r.e && (
-              <label className="field"><span className="lbl">Link to a hunt (adds to its caught count)</span>
+              <label className="field"><span className="lbl">Link to a hunt (counts toward its target when the requirements are met)</span>
                 <select value={r.link} onChange={e => setLinks({ ...links, [i]: e.target.value })}>
                   <option value="">Do not link</option>
                   {r.options.map(h => <option key={h.id} value={h.id}>{pretty(h.name)} hunt ({h.status})</option>)}
@@ -85,9 +86,10 @@ export default function SubmitCatch({ hunts, editing, onClose, onDone }: Props) 
                 {r.options.length === 0 && <small className="hint">There is no hunt for this Pokémon on the list.</small>}
               </label>
             )}
-            {r.check && (r.check.ok
-              ? <p className="okmsg">Meets all requirements of the linked hunt.</p>
-              : <p className="warn">Does not meet the hunt requirements: {r.check.misses.join('; ')}.</p>)}
+            {r.check && r.hunt && <>
+              <span className="lbl">Against the linked hunt: <ReqSummary r={r.check} /></span>
+              <ReqMatch c={{ nature: r.p.nature ?? null, ability: r.p.ability ?? null, shiny: r.p.shiny, ivs: r.p.ivs }} h={r.hunt} r={r.check} />
+            </>}
           </div>
         ))}
         <datalist id="species">{list.map(e => <option key={e.id} value={e.name} />)}</datalist>

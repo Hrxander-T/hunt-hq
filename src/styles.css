@@ -182,3 +182,65 @@ button.on{background:color-mix(in srgb,var(--brand) 16%,var(--card));border-colo
   .ivc{grid-area:ivc;display:grid;grid-template-columns:repeat(6,1fr) auto;gap:4px}
   .ivc i{width:auto;display:grid;justify-items:center;padding:3px 0}.ivc i small{display:block}.ivc em{width:auto;padding-left:4px}
 }
+
+/* Hunt progress and catches dialog */
+.prog{display:grid;gap:4px;font-size:.82rem;font-weight:700;color:var(--mute)}
+.meter{height:8px;border-radius:99px;background:var(--bg);overflow:hidden}
+.meter div{height:100%;background:var(--brand);border-radius:99px;transition:width .25s}.meter div.full{background:var(--ok)}
+.stepper{display:flex;gap:6px;align-items:center}.stepper input{text-align:center;width:72px}.stepper button{width:42px;padding:0;font-size:1.2rem}
+.sheet.wide{width:min(760px,100%)}
+.empty.small{padding:14px;font-size:.88rem}
+
+/* Compact hunt list */
+.htable{--cols:40px minmax(130px,1.4fr) minmax(150px,2fr) 118px 118px 80px}
+.hrow.caught{opacity:.82}
+.nm b .tiny{margin-left:6px;background:var(--warn);color:#fff;border-radius:99px;padding:0 7px;font-size:.65rem;vertical-align:middle}
+.hreq{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mute);font-weight:600;font-size:.84rem}
+.hprog{display:flex;align-items:center;gap:8px}.hprog .meter{flex:1;min-width:40px}.hprog small{font-weight:800;font-size:.76rem;color:var(--mute)}
+.meter span{display:block;height:100%;background:var(--brand);border-radius:99px}.meter span.full{background:var(--ok)}
+.hwho{display:flex;align-items:center;gap:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.84rem}
+.st{text-transform:capitalize}.st.hunting{color:var(--brand)}.st.caught{color:var(--ok)}
+.ghead b{font-size:.95rem}
+@media(max-width:860px){
+  .htable .rowmain{grid-template-columns:40px 1fr auto;grid-template-areas:"spr nm st" "spr hreq hreq" "prg prg who"}
+  .hreq{grid-area:hreq;white-space:normal;font-size:.8rem}.hprog{grid-area:prg}.hwho{grid-area:who}
+}
+
+/* Requirement match display */
+.lrow{display:grid;grid-template-columns:40px 1fr auto;gap:8px 10px;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--bg)}
+.lrow .rmatch{grid-column:1/-1}
+.linfo{display:grid;gap:3px;justify-items:start;min-width:0}
+.rq{display:inline-block;font-size:.72rem;font-weight:800;padding:1px 10px;border-radius:99px;color:#fff;background:var(--ok);vertical-align:middle}
+.rq.bad{background:var(--bad)}.rq.none{background:var(--mute)}
+.rmatch{display:grid;gap:8px}
+.rchips{display:flex;gap:6px;flex-wrap:wrap}
+.rchip{display:inline-flex;flex-direction:column;border-radius:10px;padding:3px 10px;font-size:.82rem;border:1.5px solid}
+.rchip.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--card))}
+.rchip.miss{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--card))}
+.rchip small{font-size:.7rem;color:var(--bad);font-weight:700}
+.ivm{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;max-width:460px}
+.ivmc{display:grid;justify-items:center;border-radius:10px;padding:4px 0;background:var(--bg);border:1.5px solid transparent}
+.lrow .ivmc,.prev .ivmc{background:var(--card)}
+.ivmc small{font-size:.66rem;color:var(--mute);font-weight:800}.ivmc b{font-size:1rem}.ivmc em{font-style:normal;font-size:.68rem;font-weight:800;min-height:1em}
+.ivmc.ok{background:color-mix(in srgb,var(--ok) 18%,var(--card))!important;border-color:var(--ok)}.ivmc.ok em{color:var(--ok)}.ivmc.ok em::after{content:' \2713'}
+.ivmc.bad{background:color-mix(in srgb,var(--bad) 18%,var(--card))!important;border-color:var(--bad)}.ivmc.bad em,.ivmc.bad b{color:var(--bad)}.ivmc.bad em::after{content:' \2717'}
+.st.bad{color:var(--bad)}
+.dgrid .span2{grid-column:1/-1}
+.group .cards{margin-bottom:14px}
+.viewseg{min-width:150px}.viewseg button{min-height:38px}
+
+/* Polish: visible segmented controls, label widths, toolbar layout */
+:root{--segbg:#e9e5f8}
+@media (prefers-color-scheme:dark){:root{--segbg:#2a2147}}
+.seg{background:var(--segbg)}
+.specs div{grid-template-columns:78px 1fr}
+.cdetail .actions .primary{flex:0 0 auto}
+.bar select{max-width:190px}.viewseg{min-width:130px}
+@media(max-width:640px){
+  .bar{display:grid;grid-template-columns:1fr 1fr}
+  .bar input[type=search]{grid-column:1/-1;width:100%}
+  .bar select{width:100%;max-width:none}
+  .viewseg{min-width:0}
+}
+.st.bad{text-transform:none}
+@media(max-width:640px){.bar .primary{grid-column:1/-1}}

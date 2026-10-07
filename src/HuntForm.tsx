@@ -17,7 +17,7 @@ const clamp = (n: number) => Math.min(31, Math.max(0, Math.round(n) || 0));
 export default function HuntForm({ initial, onSave, onClose }: Props) {
   const [list, setList] = useState<Entry[]>([]);
   const [q, setQ] = useState('');
-  const [d, setD] = useState<Draft>({ priority: 2, status: 'planned', shiny: false, types: [], natures: [], abilities: [], iv_reqs: {}, ...initial });
+  const [d, setD] = useState<Draft>({ priority: 2, target: 1, status: 'planned', shiny: false, types: [], natures: [], abilities: [], iv_reqs: {}, ...initial });
   const [abilityOpts, setAbilityOpts] = useState<{ name: string; hidden: boolean }[]>([]);
   const chosen = !!d.pokemon_id;
   const nat = d.natures ?? [], abs = d.abilities ?? [], iv = d.iv_reqs ?? {};
@@ -127,7 +127,16 @@ export default function HuntForm({ initial, onSave, onClose }: Props) {
               <div className="field"><span className="lbl">Priority</span><Seg<number> value={d.priority ?? 2} opts={[[1, 'Low'], [2, 'Medium'], [3, 'High']]} onChange={v => set('priority', v)} /></div>
               <div className="field"><span className="lbl">Status</span><Seg<Status> value={(d.status ?? 'planned') as Status} opts={[['planned', 'Planned'], ['hunting', 'Hunting'], ['caught', 'Caught']]} onChange={v => set('status', v)} /></div>
             </div>
-            <label className="switch"><input type="checkbox" checked={!!d.shiny} onChange={e => set('shiny', e.target.checked)} /><span className="track" /> Shiny hunt</label>
+            <div className="grid2">
+              <div className="field"><span className="lbl">Quantity needed</span>
+                <span className="stepper">
+                  <button type="button" aria-label="Fewer" onClick={() => set('target', Math.max(1, (d.target ?? 1) - 1))}>-</button>
+                  <input type="number" min={1} max={99} inputMode="numeric" value={d.target ?? 1} onChange={e => set('target', Math.min(99, Math.max(1, +e.target.value || 1)))} />
+                  <button type="button" aria-label="More" onClick={() => set('target', Math.min(99, (d.target ?? 1) + 1))}>+</button>
+                </span>
+              </div>
+              <label className="switch"><input type="checkbox" checked={!!d.shiny} onChange={e => set('shiny', e.target.checked)} /><span className="track" /> Shiny hunt</label>
+            </div>
           </section>
 
           <label className="field"><span className="lbl">Notes</span><textarea rows={3} value={d.notes ?? ''} placeholder="Moves, EVs, held item, where to find it" onChange={e => set('notes', e.target.value)} /></label>
