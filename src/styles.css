@@ -244,3 +244,30 @@ button.on{background:color-mix(in srgb,var(--brand) 16%,var(--card));border-colo
 }
 .st.bad{text-transform:none}
 @media(max-width:640px){.bar .primary{grid-column:1/-1}}
+
+/* Smogon builds panel */
+.smg{border:1.5px solid var(--line);border-radius:14px;background:var(--bg)}
+.smg>summary{cursor:pointer;padding:11px 14px;font-weight:800}
+.smg[open]>summary{border-bottom:1.5px solid var(--line)}
+.sbody{padding:12px 14px;display:grid;gap:12px}
+.sctl{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.inl{display:flex;gap:6px;align-items:center;font-size:.85rem;font-weight:700;color:var(--mute)}
+.inl select,.inl input[type=number]{width:auto;min-height:36px;padding:4px 8px}.inl input[type=number]{width:64px}.inl input[type=checkbox]{width:auto;min-height:0}
+.parts{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.85rem;font-weight:700}
+.parts label{display:flex;gap:5px;align-items:center}.parts input{width:auto;min-height:0}
+.fchips{display:flex;gap:6px;flex-wrap:wrap}.fchips button{min-height:32px;padding:3px 12px;font-size:.82rem}
+.cons{background:var(--card);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
+.cons .lbl{display:block;margin-bottom:4px}
+.ctog{min-height:32px;padding:3px 11px;font-size:.82rem;border-radius:99px}
+.ctog.on{background:var(--brand);color:#fff;border-color:var(--brand)}.ctog small{margin-left:6px;opacity:.8;font-weight:600}
+.scard{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.stop{display:flex;gap:8px;align-items:center}.stop .grow{min-width:0}
+.schip{font-size:.76rem;font-weight:700;border-radius:99px;padding:1px 10px;background:var(--bg);border:1px solid var(--line)}
+.schip.ab{border-color:var(--brand)}.schip.iv{border-color:var(--warn)}
+.scard details summary{cursor:pointer;font-size:.8rem}.scard details p{margin:4px 0 0;font-size:.82rem}
+code{background:var(--card);padding:1px 6px;border-radius:6px}
+
+/* Requirement colors in the caught list */
+.ivc i.req.ok{background:color-mix(in srgb,var(--ok) 24%,var(--card));color:var(--ok);box-shadow:inset 0 0 0 1.5px var(--ok)}
+.ivc i.req.bad{background:color-mix(in srgb,var(--bad) 20%,var(--card));color:var(--bad);box-shadow:inset 0 0 0 1.5px var(--bad)}
+.rok{color:var(--ok)!important}.rbad{color:var(--bad)!important}

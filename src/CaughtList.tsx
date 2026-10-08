@@ -140,7 +140,7 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
         </div>
       )}
 
-      <p className="muted count">{rows.length === caught.length ? `${caught.length} catches` : `${rows.length} of ${caught.length} catches`}</p>
+      <p className="muted count">{rows.length === caught.length ? `${caught.length} catches` : `${rows.length} of ${caught.length} catches`} · For catches linked to a hunt, green and red show whether each requirement is met</p>
       {rows.length === 0 ? <p className="empty">{caught.length ? 'Nothing matches those filters.' : 'No catches yet. Paste a Showdown set to submit the first one.'}</p> : (
         <div className="ctable">
           <div className="chead">

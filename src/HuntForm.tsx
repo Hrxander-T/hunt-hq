@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Hunt, IvOp, Status } from './types';
+import SmogonPanel from './SmogonPanel';
 import { loadList, details, pretty, art, NATURES, natureText, TYPE_COLORS, STATS, type Entry } from './lib';
 
 type Draft = Partial<Hunt>;
@@ -78,6 +79,7 @@ export default function HuntForm({ initial, onSave, onClose }: Props) {
         )}
 
         {chosen && <>
+          <SmogonPanel name={d.name ?? ''} notes={d.notes} allowedAbilities={abilityOpts.map(a => a.name)} onApply={patch => setD(p => ({ ...p, ...patch }))} />
           <section>
             <h4>Natures</h4>
             <p className="hint">Any nature you add is acceptable. Leave empty for any.</p>

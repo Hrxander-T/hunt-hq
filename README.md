@@ -36,3 +36,10 @@ Run `supabase/migration-caught.sql` once (after `migration-v2.sql`). Members pas
 
 ## Quantity targets and hunt catches
 Run `supabase/migration-target.sql` once. Each hunt has a quantity needed; the Catches button lists linked catches and unlinked catches of the same Pokémon that you can link.
+
+## Smogon builds (hunt form)
+Competitive sets are served as static files from `public/data/smogon/`, not from Supabase.
+1. `npm run data:smogon` downloads gens 3-9 from https://pkmn.github.io/smogon/data/sets/ (`-- --gens=9,8` for specific ones) and writes a `manifest.json`. Commit the files.
+2. In Add/Edit hunt, open "Smogon builds" to pick a generation and format, then tap "Use this build" or "Apply selected".
+3. IV rule: IVs a set lists are kept exactly; every other stat becomes "at least N" (default 20, editable), except a stat the build's nature lowers, which gets no requirement.
+4. Tests: `npm test`. Set data is copyrighted by Smogon University and its contributors; keep the credit shown in the panel.

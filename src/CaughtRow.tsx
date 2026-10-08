@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { supabase } from './supabase';
 import type { Caught, Hunt, Profile, Reaction } from './types';
-import { pretty, sprite, STATS, TYPE_COLORS } from './lib';
+import { ivLabel, pretty, sprite, STATS, TYPE_COLORS } from './lib';
 import { checkReqs, hiddenPower, ivTotal } from './paste';
 import Avatar from './Avatar';
 import ReqMatch, { ReqSummary } from './ReqMatch';
@@ -22,6 +22,7 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
   const canApprove = admin && (c.approved || !!chk?.ok);
   const canEdit = c.caught_by === me || admin;
   const hp = hiddenPower(c);
+  const hasIvReqs = !!chk && Object.keys(chk.stats).length > 0;
   const run = async (p: PromiseLike<{ error: { message: string } | null }>) => { const { error } = await p; if (error) setErr(error.message); else { setErr(''); onChanged(); } };
   const toggle = (kind: string) => {
     const mine = reactions.some(r => r.user_id === me && r.kind === kind);
@@ -36,10 +37,15 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
         <img className="spr" src={sprite(c.pokemon_id, c.shiny)} alt="" loading="lazy" decoding="async" />
         <span className="nm"><b>{pretty(c.species)}</b><small>{[c.nickname, c.level && `Lv ${c.level}`, c.shiny && 'Shiny'].filter(Boolean).join(' · ')}</small></span>
         <span className={`gd ${c.gender ?? ''}`}>{c.gender ?? ''}</span>
-        <span className="nat">{c.nature ?? '-'}</span>
-        <span className="abl">{c.ability ?? '-'}</span>
+        <span className={`nat${chk?.nature === 'ok' ? ' rok' : chk?.nature === 'miss' ? ' rbad' : ''}`}>{c.nature ?? '-'}</span>
+        <span className={`abl${chk?.ability === 'ok' ? ' rok' : chk?.ability === 'miss' ? ' rbad' : ''}`}>{c.ability ?? '-'}</span>
         <span className="ivc">
-          {STATS.map(([k, l]) => { const v = c.ivs?.[k]; return <i key={k} className={v === 31 ? 'max' : v === 0 ? 'zero' : ''}><small>{l}</small>{v ?? '-'}</i>; })}
+          {STATS.map(([k, l]) => {
+            const v = c.ivs?.[k], s = chk?.stats[k];
+            // With a linked hunt that has IV requirements, colors show requirement results; otherwise 31 is green and 0 is red.
+            const cls = hasIvReqs ? (s ? (s.ok ? 'req ok' : 'req bad') : '') : v === 31 ? 'max' : v === 0 ? 'zero' : '';
+            return <i key={k} className={cls} title={s ? `${s.ok ? 'Meets' : 'Misses'} the hunt requirement (${ivLabel(s.req)})` : undefined}><small>{l}</small>{v ?? '-'}</i>;
+          })}
           <em title="Total IVs">{ivTotal(c.ivs)}</em>
         </span>
         <span className="hpw" title="Hidden Power type">{hp ?? ''}</span>
