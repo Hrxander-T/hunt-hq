@@ -10,6 +10,7 @@ import ProfileDialog from './ProfileDialog';
 import HuntCatches from './HuntCatches';
 import Avatar from './Avatar';
 import CaughtList from './CaughtList';
+import BuildsTab from './BuildsTab';
 
 const NEXT: Record<Status, Status> = { planned: 'hunting', hunting: 'caught', caught: 'planned' };
 const GROUPS: [Status, string][] = [['hunting', 'Hunting'], ['planned', 'Planned'], ['caught', 'Caught']];
@@ -27,12 +28,12 @@ export default function Board({ me }: { me: string }) {
   const [q, setQ] = useState(''); const [status, setStatus] = useState(''); const [sort, setSort] = useState('priority');
   const [hunter, setHunter] = useState('');
   const [catchesId, setCatchesId] = useState('');
-  const [form, setForm] = useState<{ edit?: Hunt } | null>(null);
+  const [form, setForm] = useState<{ edit?: Hunt; draft?: Partial<Hunt> } | null>(null);
   const [err, setErr] = useState('');
   const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState(false);
   const [profile, setProfile] = useState(false);
-  const [tab, setTab] = useState<'hunts' | 'caught'>('hunts');
+  const [tab, setTab] = useState<'hunts' | 'caught' | 'builds'>('hunts');
   const [grouped, setGrouped] = useState(() => { try { return localStorage.getItem('hunt.group') !== '0'; } catch { return true; } });
   const [view, setView] = useState<'list' | 'cards'>(() => { try { return localStorage.getItem('hunt.view') === 'cards' ? 'cards' : 'list'; } catch { return 'list'; } });
   const chooseView = (v: 'list' | 'cards') => { setView(v); try { localStorage.setItem('hunt.view', v); } catch { /* ignore */ } };
@@ -139,8 +140,10 @@ export default function Board({ me }: { me: string }) {
       <div className="seg tabs" role="tablist">
         <button className={tab === 'hunts' ? 'on' : ''} onClick={() => setTab('hunts')}>Hunts</button>
         <button className={tab === 'caught' ? 'on' : ''} onClick={() => setTab('caught')}>Caught ({caught.length})</button>
+        <button className={tab === 'builds' ? 'on' : ''} onClick={() => setTab('builds')}>Builds</button>
       </div>
-      {tab === 'caught' ? <CaughtList caught={caught} hunts={hunts} people={people} reactions={reactions} me={me} admin={admin} onChanged={load} /> : <>
+      {tab === 'builds' ? <BuildsTab hunts={hunts} onCreateHunt={draft => setForm({ draft })} />
+        : tab === 'caught' ? <CaughtList caught={caught} hunts={hunts} people={people} reactions={reactions} me={me} admin={admin} onChanged={load} /> : <>
         <div className="bar">
           <input type="search" placeholder="Search Pokémon, nature, ability, hunter" value={q} onChange={e => setQ(e.target.value)} aria-label="Search" />
           <select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by status"><option value="">All statuses</option><option value="planned">Planned</option><option value="hunting">Hunting</option><option value="caught">Caught</option></select>
@@ -172,7 +175,7 @@ export default function Board({ me }: { me: string }) {
       {catchesHunt && <HuntCatches hunt={catchesHunt} caught={caught} people={people} me={me} admin={admin} onClose={() => setCatchesId('')} onChanged={load} />}
       {profile && <ProfileDialog me={me} current={people[me]} onClose={() => setProfile(false)} onSaved={() => { setProfile(false); load(); }} />}
       {panel && <AdminPanel onClose={() => setPanel(false)} />}
-      {form && <HuntForm initial={form.edit} onSave={save} onClose={() => setForm(null)} />}
+      {form && <HuntForm initial={form.edit} draft={form.draft} onSave={save} onClose={() => setForm(null)} />}
     </div>
   );
 }

@@ -53,3 +53,34 @@ export async function details(id: number) {
   localStorage.setItem(key, JSON.stringify(out));
   return out;
 }
+
+// Abilities keep their slot when a Pokémon evolves (1 and 2 are normal, 3 is hidden), so we need the slot numbers.
+export interface AbilitySlot { name: string; slot: number; hidden: boolean }
+export interface PokeInfo { species: string; abilities: AbilitySlot[] }
+export async function pokeInfo(nameOrId: string | number): Promise<PokeInfo> {
+  const key = `poke2.${nameOrId}`;
+  try { const c = localStorage.getItem(key); if (c) return JSON.parse(c) as PokeInfo; } catch { /* ignore */ }
+  const j = await (await fetch(`https://pokeapi.co/api/v2/pokemon/${nameOrId}`)).json();
+  const out: PokeInfo = {
+    species: j.species.name,
+    abilities: j.abilities.map((a: { ability: { name: string }; slot: number; is_hidden: boolean }) => ({ name: pretty(a.ability.name), slot: a.slot, hidden: a.is_hidden })),
+  };
+  try { localStorage.setItem(key, JSON.stringify(out)); } catch { /* ignore */ }
+  return out;
+}
+
+// Species this Pokémon evolves into (every later stage), from PokéAPI's evolution chain. Example: larvitar -> pupitar, tyranitar.
+export async function laterStages(species: string): Promise<string[]> {
+  const key = `evo.${species}`;
+  try { const c = localStorage.getItem(key); if (c) return JSON.parse(c) as string[]; } catch { /* ignore */ }
+  interface Node { species: { name: string }; evolves_to: Node[] }
+  const sp = await (await fetch(`https://pokeapi.co/api/v2/pokemon-species/${species}`)).json();
+  const chain = await (await fetch(sp.evolution_chain.url)).json();
+  const find = (n: Node): Node | null => (n.species.name === species ? n : n.evolves_to.map(find).find(Boolean) ?? null);
+  const out: string[] = [];
+  const walk = (n: Node) => n.evolves_to.forEach(c => { out.push(c.species.name); walk(c); });
+  const node = find(chain.chain as Node);
+  if (node) walk(node);
+  try { localStorage.setItem(key, JSON.stringify(out)); } catch { /* ignore */ }
+  return out;
+}

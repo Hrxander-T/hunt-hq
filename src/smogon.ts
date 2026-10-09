@@ -1,5 +1,5 @@
 import type { IvReqs, StatKey } from './types';
-import { NATURES, STATS } from './lib';
+import { NATURES, STATS, type AbilitySlot } from './lib';
 
 export type Stats = Partial<Record<StatKey, number>>;
 type One<T> = T | T[];
@@ -47,12 +47,47 @@ function normalize(species: string, format: string, name: string, s: RawSet): Bu
     evs: Array.isArray(s.evs) ? s.evs : s.evs ? [s.evs] : [], moves: (s.moves ?? []).map(m => arr(m)), tera: arr(s.teratypes),
   };
 }
+export function buildsForKey(data: GenData, key: string): Build[] {
+  const out: Build[] = [];
+  for (const [format, sets] of Object.entries(data[key] ?? {})) for (const [name, s] of Object.entries(sets)) out.push(normalize(key, format, name, s));
+  return out;
+}
 export function buildsFor(data: GenData, pokeName: string): Build[] {
   const key = speciesKey(data, pokeName);
-  if (!key) return [];
-  const out: Build[] = [];
-  for (const [format, sets] of Object.entries(data[key])) for (const [name, s] of Object.entries(sets)) out.push(normalize(key, format, name, s));
+  return key ? buildsForKey(data, key) : [];
+}
+
+// ---- evolution lines: builds written for a later stage (Tyranitar) can guide a hunt for an earlier one (Larvitar) ----
+export interface LineItem { poke: string; key: string }
+const REGION = /-(alola|galar|hisui|paldea)$/;
+// `later` are PokéAPI species names such as "tyranitar". A regional form evolves into that region's form when one exists
+// ("vulpix-alola" -> "ninetales-alola"), and a plain species never picks up a regional form.
+export function lineItems(data: GenData, pokeName: string, later: string[]): LineItem[] {
+  const out: LineItem[] = [];
+  const self = speciesKey(data, pokeName);
+  if (self) out.push({ poke: pokeName, key: self });
+  const region = pokeName.match(REGION)?.[1];
+  for (const sp of later) {
+    for (const cand of region ? [`${sp}-${region}`, sp] : [sp]) {
+      const key = speciesKey(data, cand);
+      if (key && !out.some(o => o.key === key)) { out.push({ poke: cand, key }); break; }
+    }
+  }
   return out;
+}
+
+// Abilities keep their slot through evolution (Larvitar's Guts becomes Tyranitar's Sand Stream), so translate by slot.
+// If the hunted species has no ability in that slot (e.g. Eevee's slot 2), a normal ability maps to its first normal ability; a hidden one has no match.
+export function mapAbility(name: string, from: AbilitySlot[], to: AbilitySlot[]): string | null {
+  const src = from.find(a => toId(a.name) === toId(name));
+  if (!src) return null;
+  const same = to.find(a => a.slot === src.slot);
+  if (same) return same.name;
+  if (src.hidden) return null;
+  return [...to].filter(a => !a.hidden).sort((a, b) => a.slot - b.slot)[0]?.name ?? null;
+}
+export function mapAbilities(names: string[], from: AbilitySlot[], to: AbilitySlot[]): string[] {
+  return [...new Set(names.map(n => mapAbility(n, from, to)).filter((x): x is string => !!x))];
 }
 
 // ---- formats ----
@@ -112,3 +147,17 @@ export function consensus(builds: Build[]): Consensus {
   };
 }
 export const evText = (e?: Stats) => (e ? STATS.filter(([k]) => e[k]).map(([k, l]) => `${e[k]} ${l}`).join(' / ') : '');
+
+// How often each value appears, most common first (used for the item summary in the Builds tab).
+export function tally(values: string[]): Tally[] {
+  const m = new Map<string, number>();
+  for (const v of values) m.set(v, (m.get(v) ?? 0) + 1);
+  return [...m].map(([value, n]) => ({ value, n })).sort((a, b) => b.n - a.n || a.value.localeCompare(b.value));
+}
+export const itemTally = (builds: Build[]): Tally[] => tally(builds.flatMap(b => [...new Set(b.items)]));
+
+// The note added to a hunt made from a build. `who` is the source species when it differs from the hunted one ("Tyranitar").
+export function buildNote(b: Build, gen: number, who = ''): string {
+  const detail = [b.items.join(' / '), evText(b.evs[0])].filter(Boolean).join(', ');
+  return `Smogon Gen ${gen} ${who ? who + ' ' : ''}${formatInfo(b.format).label}, ${b.name}${detail ? `: ${detail}` : ''}`;
+}

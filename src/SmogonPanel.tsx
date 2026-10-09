@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Hunt } from './types';
-import { STATS } from './lib';
+import { laterStages, pokeInfo, pretty, STATS, type PokeInfo } from './lib';
 import {
-  buildsFor, consensus, DEFAULT_GROUPS, evText, formatInfo, loadGen, loadManifest, toRequirements,
+  buildsForKey, consensus, DEFAULT_GROUPS, evText, formatInfo, lineItems, loadGen, loadManifest, mapAbilities, mapAbility, toRequirements,
   type Build, type GenData, type Manifest, type Stats,
 } from './smogon';
 
@@ -21,15 +21,53 @@ export default function SmogonPanel({ name, notes, allowedAbilities, onApply }: 
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [limit, setLimit] = useState(8);
   const [done, setDone] = useState('');
+  const [later, setLater] = useState<string[]>([]);
+  const [pick, setPick] = useState('');
+  const [huntInfo, setHuntInfo] = useState<PokeInfo | null>(null);
+  const [srcInfo, setSrcInfo] = useState<PokeInfo | null>(null);
 
   useEffect(() => { if (open && manifest === undefined) loadManifest().then(setManifest); }, [open, manifest]);
   const gens = manifest ? Object.keys(manifest.gens).map(Number).sort((a, b) => b - a) : [];
   const activeGen = gens.includes(gen) ? gen : gens[0];
   useEffect(() => { if (!open || !activeGen) return; let live = true; setData(undefined); loadGen(activeGen).then(d => live && setData(d)); return () => { live = false; }; }, [open, activeGen]);
 
-  const all = useMemo(() => (data ? buildsFor(data, name) : []), [data, name]);
-  const shown = useMemo(() => all.filter(b => showAll || DEFAULT_GROUPS.has(formatInfo(b.format).group))
-    .sort((a, b) => formatInfo(a.format).order - formatInfo(b.format).order || a.name.localeCompare(b.name)), [all, showAll]);
+  // The hunted species plus every later evolution stage, so a Larvitar hunt can use Tyranitar builds.
+  useEffect(() => {
+    if (!open || !name) return;
+    let live = true;
+    setLater([]); setPick(''); setHuntInfo(null);
+    pokeInfo(name).then(async i => {
+      if (!live) return;
+      setHuntInfo(i);
+      const l = await laterStages(i.species).catch(() => [] as string[]);
+      if (live) setLater(l);
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [open, name]);
+  const line = useMemo(() => {
+    if (!data) return [];
+    const inShown = (b: Build) => showAll || DEFAULT_GROUPS.has(formatInfo(b.format).group);
+    return lineItems(data, name, later).map(it => { const all = buildsForKey(data, it.key); return { ...it, all, shown: all.filter(inShown) }; });
+  }, [data, name, later, showAll]);
+  const withSets = line.filter(x => x.all.length > 0);
+  const best = line.filter(x => x.shown.length > 0).reduce<(typeof line)[number] | undefined>((m, x) => (!m || x.shown.length >= m.shown.length ? x : m), undefined);
+  const active = line.find(x => x.poke === pick) ?? line.find(x => x.poke === name && x.shown.length > 0) ?? best ?? line.find(x => x.poke === name) ?? line[0];
+  const all = active?.all ?? [];
+  const shown = useMemo(() => [...(active?.shown ?? [])].sort((a, b) => formatInfo(a.format).order - formatInfo(b.format).order || a.name.localeCompare(b.name)), [active]);
+  const translating = !!active && active.poke !== name;
+  useEffect(() => {
+    if (!active || active.poke === name) { setSrcInfo(null); return; }
+    let live = true;
+    pokeInfo(active.poke).then(i => live && setSrcInfo(i)).catch(() => undefined);
+    return () => { live = false; };
+  }, [active?.poke, name]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ready = !translating || (!!srcInfo && !!huntInfo);
+  const mapAb = (names: string[]) => (translating && srcInfo && huntInfo ? mapAbilities(names, srcInfo.abilities, huntInfo.abilities) : names);
+  const abLabel = (a: string) => {
+    if (!translating || !srcInfo || !huntInfo) return a;
+    const m = mapAbility(a, srcInfo.abilities, huntInfo.abilities);
+    return m ? `${a} → ${m}` : `${a} (no match)`;
+  };
   const formats = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of shown) m.set(b.format, (m.get(b.format) ?? 0) + 1);
@@ -38,7 +76,7 @@ export default function SmogonPanel({ name, notes, allowedAbilities, onApply }: 
   const scoped = useMemo(() => (fmt ? shown.filter(b => b.format === fmt) : shown), [shown, fmt]);
   const cons = useMemo(() => consensus(scoped), [scoped]);
 
-  useEffect(() => { setPicked({}); setLimit(8); setDone(''); }, [name, activeGen, fmt, showAll]);
+  useEffect(() => { setPicked({}); setLimit(8); setDone(''); }, [name, activeGen, fmt, showAll, active?.poke]);
   useEffect(() => { if (fmt && !formats.some(f => f.id === fmt)) setFmt(''); }, [formats, fmt]);
 
   const on = (key: string, def: boolean) => picked[key] ?? def;
@@ -49,11 +87,12 @@ export default function SmogonPanel({ name, notes, allowedAbilities, onApply }: 
   const apply = (natures: string[], abilities: string[], ivs: Stats, label: string, detail: string) => {
     const patch: Partial<Hunt> = {};
     if (parts.natures) patch.natures = natures;
-    if (parts.abilities) patch.abilities = allowed(abilities);
+    if (parts.abilities) patch.abilities = allowed(mapAb(abilities));
     if (parts.ivs) patch.iv_reqs = toRequirements(natures, ivs, minOther);
     if (parts.note) {
-      const line = `Smogon Gen ${activeGen} ${label}${detail ? `: ${detail}` : ''}`;
-      if (!(notes ?? '').includes(line)) patch.notes = [(notes ?? '').trim(), line].filter(Boolean).join('\n');
+      const who = translating && active ? `${pretty(active.poke)} ` : '';
+      const entry = `Smogon Gen ${activeGen} ${who}${label}${detail ? `: ${detail}` : ''}`;
+      if (!(notes ?? '').includes(entry)) patch.notes = [(notes ?? '').trim(), entry].filter(Boolean).join('\n');
     }
     onApply(patch);
     setDone(label);
@@ -96,8 +135,18 @@ export default function SmogonPanel({ name, notes, allowedAbilities, onApply }: 
 
             {data === undefined && <p className="hint">Loading Gen {activeGen} sets…</p>}
             {data === null && <p className="err">Could not load the Gen {activeGen} file.</p>}
-            {data && all.length === 0 && <p className="hint">No Smogon sets for this Pokémon in Gen {activeGen}. Try another generation.</p>}
+            {data && withSets.length === 0 && <p className="hint">No Smogon sets for {pretty(name)} or its evolutions in Gen {activeGen}. Try another generation.</p>}
             {data && all.length > 0 && shown.length === 0 && <p className="hint">All {all.length} sets are in other formats. Turn on "Show all formats".</p>}
+
+            {data && withSets.length > 0 && (withSets.length > 1 || translating) && (
+              <div>
+                <span className="lbl">Builds for</span>
+                <div className="fchips" role="group" aria-label="Species">
+                  {withSets.map(x => <button type="button" key={x.poke} className={active?.poke === x.poke ? 'on' : ''} onClick={() => { setPick(x.poke); setFmt(''); }}>{pretty(x.poke)} ({x.shown.length})</button>)}
+                </div>
+                {translating && active && <p className="hint">{pretty(name)} evolves into {pretty(active.poke)}. Natures and IVs carry over when it evolves. Abilities are matched by slot, so each build ability is translated to the matching {pretty(name)} ability (shown as "Sand Stream → Guts").</p>}
+              </div>
+            )}
 
             {shown.length > 0 && (
               <>
@@ -115,22 +164,22 @@ export default function SmogonPanel({ name, notes, allowedAbilities, onApply }: 
                   })}</div></div>}
                   {cons.abilities.length > 0 && <div><span className="lbl">Abilities</span><div className="chips left">{cons.abilities.map(t => {
                     const def = t.n >= Math.max(1, Math.ceil(topAb / 2)), k = `a:${t.value}`;
-                    return <button type="button" key={k} className={`ctog ${on(k, def) ? 'on' : ''}`} aria-pressed={on(k, def)} onClick={() => toggle(k, def)}>{t.value}<small>{t.n}</small></button>;
+                    return <button type="button" key={k} className={`ctog ${on(k, def) ? 'on' : ''}`} aria-pressed={on(k, def)} onClick={() => toggle(k, def)}>{abLabel(t.value)}<small>{t.n}</small></button>;
                   })}</div></div>}
                   {cons.ivs.length > 0 && <div><span className="lbl">IVs listed by sets</span><div className="chips left">{cons.ivs.map(t => {
                     const def = t.n >= ivThr, k = `i:${t.stat}:${t.v}`;
                     return <button type="button" key={k} className={`ctog ${on(k, def) ? 'on' : ''}`} aria-pressed={on(k, def)} onClick={() => toggle(k, def)}>{lab(t.stat)} {t.v}<small>{t.n}</small></button>;
                   })}</div></div>}
-                  <div><button type="button" className="primary small" onClick={useConsensus}>Apply selected</button></div>
+                  <div><button type="button" className="primary small" disabled={!ready} onClick={useConsensus}>Apply selected</button></div>
                 </div>
 
                 {scoped.slice(0, limit).map(b => (
                   <div className="scard" key={b.key}>
                     <div className="stop"><div className="grow"><b>{formatInfo(b.format).label}</b> <span className="muted">{b.name}</span></div>
-                      <button type="button" className="small primary" onClick={() => useBuild(b)}>Use this build</button></div>
+                      <button type="button" className="small primary" disabled={!ready} onClick={() => useBuild(b)}>Use this build</button></div>
                     <div className="chips left">
                       {b.natures.map(n => <span key={n} className="schip">{n}</span>)}
-                      {b.abilities.map(a => <span key={a} className="schip ab">{a}</span>)}
+                      {b.abilities.map(a => <span key={a} className="schip ab">{abLabel(a)}</span>)}
                       {Object.entries(b.ivs).map(([k, v]) => <span key={k} className="schip iv">{lab(k)} {v}</span>)}
                     </div>
                     <small className="muted">{[b.items.join(' / '), evText(b.evs[0]) + (b.evs.length > 1 ? ' (or other spreads)' : '')].filter(Boolean).join('  ·  ')}</small>

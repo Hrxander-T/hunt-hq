@@ -4,7 +4,8 @@ import SmogonPanel from './SmogonPanel';
 import { loadList, details, pretty, art, NATURES, natureText, TYPE_COLORS, STATS, type Entry } from './lib';
 
 type Draft = Partial<Hunt>;
-interface Props { initial?: Hunt; onSave: (d: Draft) => void; onClose: () => void }
+// `draft` prefills a NEW hunt (for example from a Smogon build); `initial` edits an existing one.
+interface Props { initial?: Hunt; draft?: Draft; onSave: (d: Draft) => void; onClose: () => void }
 
 function Seg<T extends string | number>({ value, opts, onChange }: { value: T; opts: [T, string][]; onChange: (v: T) => void }) {
   return (
@@ -15,15 +16,19 @@ function Seg<T extends string | number>({ value, opts, onChange }: { value: T; o
 }
 const clamp = (n: number) => Math.min(31, Math.max(0, Math.round(n) || 0));
 
-export default function HuntForm({ initial, onSave, onClose }: Props) {
+export default function HuntForm({ initial, draft, onSave, onClose }: Props) {
   const [list, setList] = useState<Entry[]>([]);
   const [q, setQ] = useState('');
-  const [d, setD] = useState<Draft>({ priority: 2, target: 1, status: 'planned', shiny: false, types: [], natures: [], abilities: [], iv_reqs: {}, ...initial });
+  const [d, setD] = useState<Draft>({ priority: 2, target: 1, status: 'planned', shiny: false, types: [], natures: [], abilities: [], iv_reqs: {}, ...(initial ?? draft) });
   const [abilityOpts, setAbilityOpts] = useState<{ name: string; hidden: boolean }[]>([]);
   const chosen = !!d.pokemon_id;
   const nat = d.natures ?? [], abs = d.abilities ?? [], iv = d.iv_reqs ?? {};
 
-  useEffect(() => { loadList().then(setList); if (initial) details(initial.pokemon_id).then(x => setAbilityOpts(x.abilities)); }, [initial]);
+  useEffect(() => {
+    loadList().then(setList);
+    const seed = initial ?? draft;
+    if (seed?.pokemon_id) details(seed.pokemon_id).then(x => { setAbilityOpts(x.abilities); setD(p => (p.types?.length ? p : { ...p, types: x.types })); });
+  }, [initial, draft]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);

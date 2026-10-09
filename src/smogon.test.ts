@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sample from './__fixtures__/smogon-sample.json';
-import { buildsFor, consensus, formatInfo, speciesKey, toRequirements, type GenData } from './smogon';
+import { buildsFor, consensus, formatInfo, lineItems, mapAbilities, mapAbility, speciesKey, buildNote, itemTally, tally, toRequirements, type GenData } from './smogon';
+import type { AbilitySlot } from './lib';
 
 const data = sample as unknown as GenData;
 
@@ -66,5 +67,83 @@ describe('consensus', () => {
     expect(c.natures[0]).toEqual({ value: 'Timid', n: 4 });
     expect(c.ivs.find(i => i.stat === 'atk')).toMatchObject({ v: 0 });
     expect(c.abilities.find(a => a.value === 'Chlorophyll')!.n).toBe(4);
+  });
+});
+
+// ---- evolution lines and ability translation ----
+const set = { moves: [['Tackle']] };
+const lineData = {
+  Vulpix: { ou: { A: set } }, 'Vulpix-Alola': { ou: { A: set } },
+  Ninetales: { ou: { A: set } }, 'Ninetales-Alola': { ou: { A: set } },
+  Larvitar: { lc: { A: set } }, Tyranitar: { ou: { A: set } },
+  Sandshrew: { ou: { A: set } }, 'Sandslash-Alola': { ou: { A: set } },
+} as unknown as GenData;
+const keys = (r: { key: string }[]) => r.map(x => x.key);
+
+describe('lineItems', () => {
+  it('leads a regional form to its regional evolution', () => {
+    expect(keys(lineItems(lineData, 'vulpix-alola', ['ninetales']))).toEqual(['Vulpix-Alola', 'Ninetales-Alola']);
+  });
+  it('never picks a regional form for a plain species', () => {
+    expect(keys(lineItems(lineData, 'vulpix', ['ninetales']))).toEqual(['Vulpix', 'Ninetales']);
+    // even when only the regional evolution has sets
+    expect(keys(lineItems(lineData, 'sandshrew', ['sandslash']))).toEqual(['Sandshrew']);
+  });
+  it('falls back to the plain evolution when a regional form has no regional evolution', () => {
+    expect(keys(lineItems(lineData, 'vulpix-alola', ['tyranitar']))).toEqual(['Vulpix-Alola', 'Tyranitar']);
+  });
+  it('includes later stages and skips species without sets', () => {
+    expect(keys(lineItems(lineData, 'larvitar', ['pupitar', 'tyranitar']))).toEqual(['Larvitar', 'Tyranitar']);
+    expect(lineItems(lineData, 'larvitar', ['tyranitar'])[1]).toEqual({ poke: 'tyranitar', key: 'Tyranitar' });
+  });
+});
+
+describe('mapAbility', () => {
+  const larvitar: AbilitySlot[] = [{ name: 'Guts', slot: 1, hidden: false }, { name: 'Sand Veil', slot: 3, hidden: true }];
+  const tyranitar: AbilitySlot[] = [{ name: 'Sand Stream', slot: 1, hidden: false }, { name: 'Unnerve', slot: 3, hidden: true }];
+  it('translates by slot (Tyranitar to Larvitar)', () => {
+    expect(mapAbility('Sand Stream', tyranitar, larvitar)).toBe('Guts');
+    expect(mapAbility('Unnerve', tyranitar, larvitar)).toBe('Sand Veil');
+    expect(mapAbility('sand stream', tyranitar, larvitar)).toBe('Guts'); // case-insensitive
+  });
+  it('returns null for an ability the source species does not have', () => {
+    expect(mapAbility('Intimidate', tyranitar, larvitar)).toBeNull();
+  });
+  it('handles a slot gap: a normal ability maps to the first normal one, a hidden one has no match', () => {
+    const src: AbilitySlot[] = [{ name: 'Flash Fire', slot: 1, hidden: false }, { name: 'Water Veil', slot: 2, hidden: false }, { name: 'Guts', slot: 3, hidden: true }];
+    const dst: AbilitySlot[] = [{ name: 'Run Away', slot: 1, hidden: false }]; // no slot 2, no hidden
+    expect(mapAbility('Water Veil', src, dst)).toBe('Run Away');
+    expect(mapAbility('Guts', src, dst)).toBeNull();
+    expect(mapAbility('Water Veil', src, [{ name: 'Anticipation', slot: 3, hidden: true }])).toBeNull(); // nothing normal to fall back to
+  });
+  it('mapAbilities de-duplicates and drops misses', () => {
+    const src: AbilitySlot[] = [{ name: 'A', slot: 1, hidden: false }, { name: 'B', slot: 2, hidden: false }, { name: 'C', slot: 3, hidden: true }];
+    const dst: AbilitySlot[] = [{ name: 'X', slot: 1, hidden: false }];
+    expect(mapAbilities(['A', 'B', 'C', 'Nope'], src, dst)).toEqual(['X']);
+  });
+});
+
+describe('builds tab helpers', () => {
+  const b = {
+    key: 'k', species: 'Tyranitar', format: 'gen9ou', name: 'Dragon Dance', natures: ['Jolly'], abilities: ['Sand Stream'], items: ['Leftovers', 'Choice Band'],
+    ivs: {}, evs: [{ atk: 252, spe: 252, hp: 4 }, { atk: 252, hp: 252 }], tera: [], moves: [],
+  } as unknown as Parameters<typeof buildNote>[0];
+  it('tally counts and sorts most common first', () => {
+    expect(tally(['a', 'b', 'b', 'c', 'c', 'c'])).toEqual([{ value: 'c', n: 3 }, { value: 'b', n: 2 }, { value: 'a', n: 1 }]);
+  });
+  it('itemTally counts each item once per set', () => {
+    const two = [b, { ...b, items: ['Leftovers'] }] as typeof b[];
+    expect(itemTally(two)).toEqual([{ value: 'Leftovers', n: 2 }, { value: 'Choice Band', n: 1 }]);
+  });
+  it('buildNote names the source species only when given', () => {
+    const plain = buildNote(b, 9);
+    expect(plain.startsWith('Smogon Gen 9 ')).toBe(true);
+    expect(plain).toContain('Dragon Dance');
+    expect(plain).toContain('Leftovers / Choice Band');
+    expect(buildNote(b, 9, 'Tyranitar')).toContain('Gen 9 Tyranitar ');
+  });
+  it('mapAbility ignores apostrophes and hyphens (PokeAPI vs Showdown spelling)', () => {
+    const slots: AbilitySlot[] = [{ name: 'Minds Eye', slot: 1, hidden: false }];
+    expect(mapAbility("Mind's Eye", slots, slots)).toBe('Minds Eye');
   });
 });
