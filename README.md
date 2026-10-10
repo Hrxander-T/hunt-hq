@@ -43,3 +43,31 @@ Competitive sets are served as static files from `public/data/smogon/`, not from
 2. In Add/Edit hunt, open "Smogon builds" to pick a generation and format, then tap "Use this build" or "Apply selected".
 3. IV rule: IVs a set lists are kept exactly; every other stat becomes "at least N" (default 20, editable), except a stat the build's nature lowers, which gets no requirement.
 4. Tests: `npm test`. Set data is copyrighted by Smogon University and its contributors; keep the credit shown in the panel.
+
+## Dump tab (screenshots to Caught)
+
+Drop screenshots of Pokémon summary screens into the **Dump** tab. Each one is read by the card reader (a separate API, see
+`../poke-reader/API_INTEGRATION.md`), shown next to editable fields, and saved to **Caught** once you have checked it.
+
+- **Setup:** set `VITE_READER_URL` in `.env` to the reader's base URL, for example `https://xxxx.ngrok-free.dev/pokemmo`
+  (no trailing slash needed). When the app is served over https the reader URL must be https too.
+- **Flow:** the queue reads one screenshot at a time. Fields the reader was unsure about are highlighted with its own message.
+  Confirm (✓ Right) or edit each one, then **Save & next** (Ctrl+Enter). **Skip** is Esc. Nothing is ever saved automatically.
+- **Queue storage:** the queue lives in this browser's IndexedDB (one database per user) and survives a reload. It is not shared
+  between devices. If the browser cannot store it, a warning appears and the page asks before closing while work is unsaved.
+- **Code:** `src/dump/` (`readerApi.ts` talks to the reader, `mapping.ts` turns a card into app data and decides which fields
+  to highlight, `queue.ts` + `store.ts` are the queue, `DumpTab.tsx` + `ReviewPane.tsx` are the screens). The row written to
+  `caught` is built by `src/catchPayload.ts`, shared with the Submit-a-catch form.
+- **Tests:** `npm test` (the queue, the mapping and the review pane are covered; the real IndexedDB and the live reader are not).
+
+### Security: decide before sharing the app widely
+
+The reader API is currently open: anyone who finds its URL can use the owner's PC. Options, cheapest first:
+
+1. Set the reader's `ALLOWED_ORIGINS` to this app's real origin and add rate limiting on the server. This stops other websites,
+   not scripts.
+2. Better: a Supabase Edge Function (like `redeem-invite`) that checks the user's login and `is_active()`, then forwards the
+   upload to the reader with a secret key kept on the server. Check Supabase's request-size and time limits first: the slow
+   fallback reader can take over a minute.
+3. `VITE_READER_API_KEY` exists for local development only. Anything in a `VITE_` variable is public in the built JavaScript,
+   so never put a real key there for production.

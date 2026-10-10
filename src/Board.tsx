@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './supabase';
 import type { Caught, Hunt, Profile, Reaction, Status } from './types';
 import { checkReqs } from './paste';
@@ -11,6 +11,8 @@ import HuntCatches from './HuntCatches';
 import Avatar from './Avatar';
 import CaughtList from './CaughtList';
 import BuildsTab from './BuildsTab';
+import DumpTab from './dump/DumpTab';
+import { useDumpQueue } from './dump/useDumpQueue';
 
 const NEXT: Record<Status, Status> = { planned: 'hunting', hunting: 'caught', caught: 'planned' };
 const GROUPS: [Status, string][] = [['hunting', 'Hunting'], ['planned', 'Planned'], ['caught', 'Caught']];
@@ -33,7 +35,8 @@ export default function Board({ me }: { me: string }) {
   const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState(false);
   const [profile, setProfile] = useState(false);
-  const [tab, setTab] = useState<'hunts' | 'caught' | 'builds'>('hunts');
+  const [tab, setTab] = useState<'hunts' | 'caught' | 'builds' | 'dump'>('hunts');
+  const dump = useDumpQueue(me); // lives here, above the tab switch, so screenshots keep being read while another tab is open
   const [grouped, setGrouped] = useState(() => { try { return localStorage.getItem('hunt.group') !== '0'; } catch { return true; } });
   const [view, setView] = useState<'list' | 'cards'>(() => { try { return localStorage.getItem('hunt.view') === 'cards' ? 'cards' : 'list'; } catch { return 'list'; } });
   const chooseView = (v: 'list' | 'cards') => { setView(v); try { localStorage.setItem('hunt.view', v); } catch { /* ignore */ } };
@@ -56,13 +59,16 @@ export default function Board({ me }: { me: string }) {
     setHunts(h.data as Hunt[]); setCaught((c.data ?? []) as Caught[]); setReactions((r.data ?? []) as Reaction[]);
     setPeople(Object.fromEntries(((p.data ?? []) as Profile[]).map(x => [x.id, x])));
   }, []);
+  // Realtime events arrive in bursts (saving 20 catches = 20 events), so they trigger one reload shortly after the last one.
+  const soon = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const loadSoon = useCallback(() => { clearTimeout(soon.current); soon.current = setTimeout(load, 500); }, [load]);
   useEffect(() => {
     load();
-    const ch = supabase.channel('team').on('postgres_changes', { event: '*', schema: 'public' }, () => load()).subscribe();
+    const ch = supabase.channel('team').on('postgres_changes', { event: '*', schema: 'public' }, () => loadSoon()).subscribe();
     const t = setInterval(load, 60000);
     window.addEventListener('focus', load);
-    return () => { supabase.removeChannel(ch); clearInterval(t); window.removeEventListener('focus', load); };
-  }, [load]);
+    return () => { supabase.removeChannel(ch); clearInterval(t); clearTimeout(soon.current); window.removeEventListener('focus', load); };
+  }, [load, loadSoon]);
 
   const run = async (p: PromiseLike<{ error: { message: string } | null }>) => { const { error } = await p; if (error) setErr(error.message); else load(); };
   const save = async (d: Partial<Hunt>) => {
@@ -141,8 +147,10 @@ export default function Board({ me }: { me: string }) {
         <button className={tab === 'hunts' ? 'on' : ''} onClick={() => setTab('hunts')}>Hunts</button>
         <button className={tab === 'caught' ? 'on' : ''} onClick={() => setTab('caught')}>Caught ({caught.length})</button>
         <button className={tab === 'builds' ? 'on' : ''} onClick={() => setTab('builds')}>Builds</button>
+        <button className={tab === 'dump' ? 'on' : ''} onClick={() => setTab('dump')}>Dump ({dump.pending})</button>
       </div>
       {tab === 'builds' ? <BuildsTab hunts={hunts} onCreateHunt={draft => setForm({ draft })} />
+        : tab === 'dump' ? <DumpTab dump={dump} hunts={hunts} caught={caught} me={me} onChanged={loadSoon} />
         : tab === 'caught' ? <CaughtList caught={caught} hunts={hunts} people={people} reactions={reactions} me={me} admin={admin} onChanged={load} /> : <>
         <div className="bar">
           <input type="search" placeholder="Search Pokémon, nature, ability, hunter" value={q} onChange={e => setQ(e.target.value)} aria-label="Search" />

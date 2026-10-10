@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
 import type { Caught, Hunt } from './types';
-import { art, details, loadList, pretty, STATS, type Entry } from './lib';
+import { art, loadList, pretty, STATS, type Entry } from './lib';
 import { checkReqs, findSpecies, parsePaste } from './paste';
+import { buildCatchPayload } from './catchPayload';
 import ReqMatch, { ReqSummary } from './ReqMatch';
 
 interface Props { hunts: Hunt[]; editing?: Caught; onClose: () => void; onDone: () => void }
@@ -36,14 +37,7 @@ export default function SubmitCatch({ hunts, editing, onClose, onDone }: Props) 
   const save = async () => {
     setBusy(true); setMsg('');
     try {
-      const payload = await Promise.all(rows.map(async r => {
-        const d = await details(r.e!.id);
-        return {
-          pokemon_id: r.e!.id, species: r.e!.name, types: d.types, nickname: r.p.nickname ?? null, level: r.p.level ?? null,
-          nature: r.p.nature ?? null, ability: r.p.ability ?? null, item: r.p.item ?? null, gender: r.p.gender ?? null,
-          shiny: r.p.shiny, ivs: r.p.ivs, evs: r.p.evs, moves: r.p.moves, paste: r.p.raw, hunt_id: r.link || null,
-        };
-      }));
+      const payload = await Promise.all(rows.map(r => buildCatchPayload(r.e!, r.p, r.link)));
       const { error } = editing
         ? await supabase.from('caught').update(payload[0]).eq('id', editing.id)
         : await supabase.from('caught').insert(payload);
