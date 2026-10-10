@@ -15,6 +15,7 @@ export interface DumpItem {
   order: number; // list position; a second card from the same screenshot sits just after the first (e.g. 3 and 3.001)
   status: ItemStatus; card?: ReaderCard; cardIndex: number; cardCount: number;
   error?: string; // why reading failed
+  cloudId?: string; // Cloudinary id when the screenshot came from the Android capture app; the cloud copy is deleted once every card of it is saved or skipped
   edits?: Draft; confirmed: ConfirmKey[]; huntId?: string | null; // the user's work; huntId undefined = not chosen yet
   savedId?: string; saveError?: string; saving?: boolean; // saving and saveError are never persisted
 }
@@ -25,6 +26,7 @@ export interface QueueStore { all(): Promise<DumpItem[]>; put(item: DumpItem): P
 export interface QueueDeps {
   read(file: File, signal: AbortSignal): Promise<ReaderCard[]>;
   store: QueueStore; hash(file: File): Promise<string>; uid(): string; now(): number;
+  release?(cloudId: string): Promise<boolean>; // deletes the cloud copy of a phone screenshot; true = done, false = try again later
 }
 
 export async function sha256Hex(file: Blob): Promise<string> {
@@ -67,6 +69,7 @@ export class DumpQueue {
   private addChain: Promise<unknown> = Promise.resolve();
   private loadP: Promise<void> = Promise.resolve();
   private active = 0; private gen = 0; private disposed = false;
+  private released = new Set<string>(); // cloud copies already asked to be deleted
   private deps: QueueDeps; private maxParallel: number;
   constructor(deps: QueueDeps, maxParallel = MAX_PARALLEL) { this.deps = deps; this.maxParallel = maxParallel; }
 
@@ -119,21 +122,40 @@ export class DumpQueue {
   }
 
   // ---- adding ----
-  add(files: File[]): Promise<AddResult> {
-    const p = this.addChain.then(() => this.doAdd(files));
+  add(files: File[], cloudIds?: (string | undefined)[]): Promise<AddResult> {
+    const p = this.addChain.then(() => this.doAdd(files, cloudIds));
     this.addChain = p.catch(() => undefined);
     return p;
   }
-  private async doAdd(files: File[]): Promise<AddResult> {
+  /** Delete the cloud copy of a phone screenshot, once. If the delete fails it is tried again the next time the phone list is checked. */
+  private release(cloudId: string) {
+    if (this.released.has(cloudId)) return;
+    this.released.add(cloudId);
+    const undo = () => { this.released.delete(cloudId); };
+    Promise.resolve(this.deps.release?.(cloudId)).then(ok => { if (ok === false) undo(); }).catch(undo);
+  }
+  /** Release the cloud copy when every card that came from it is saved or skipped (or gone). */
+  private settle(cloudId?: string) {
+    if (!cloudId) return;
+    if (this.state.items.some(i => i.cloudId === cloudId && i.status !== 'saved' && i.status !== 'skipped')) return;
+    this.release(cloudId);
+  }
+  private async doAdd(files: File[], cloudIds?: (string | undefined)[]): Promise<AddResult> {
     await this.loadP;
     const res: AddResult = { added: 0, duplicates: [], rejected: [] };
-    for (const f of files) {
+    for (const [k, f] of files.entries()) {
       const hash = await this.deps.hash(f);
       const items = this.state.items;
-      if (items.some(i => i.hash === hash)) { res.duplicates.push(f.name); continue; }
+      const cloudId = cloudIds?.[k];
+      const same = items.find(i => i.hash === hash);
+      if (same) { // already in the queue: the cloud copy is not needed (unless that item uses it)
+        res.duplicates.push(f.name);
+        if (cloudId && same.cloudId !== cloudId) this.release(cloudId);
+        continue;
+      }
       if (items.length >= MAX_ITEMS) { res.rejected.push(f.name); continue; }
       const order = Math.floor(Math.max(0, ...items.map(i => i.order))) + 1;
-      const item: DumpItem = { id: this.deps.uid(), hash, name: f.name, blob: f, createdAt: this.deps.now(), order, status: 'queued', cardIndex: 0, cardCount: 1, confirmed: [] };
+      const item: DumpItem = { id: this.deps.uid(), hash, name: f.name, blob: f, createdAt: this.deps.now(), order, status: 'queued', cardIndex: 0, cardCount: 1, confirmed: [], cloudId };
       this.set({ items: [...items, item] }); this.save(item.id);
       res.added++; this.pump();
     }
@@ -185,7 +207,7 @@ export class DumpQueue {
     this.patch(id, { status: 'failed', error: 'Cancelled.' });
     this.aborts.get(id)?.abort();
   }
-  skip(id: string) { const i = this.get(id); if (i && (needsAction(i) || i.status === 'queued') && !i.saving) this.patch(id, { status: 'skipped' }); }
+  skip(id: string) { const i = this.get(id); if (i && (needsAction(i) || i.status === 'queued') && !i.saving) { this.patch(id, { status: 'skipped' }); this.settle(i.cloudId); } }
   reopen(id: string) { const i = this.get(id); if (i?.status === 'skipped') { this.patch(id, { status: i.card ? statusOf(i.card) : 'queued' }); this.pump(); } }
   /** Save the user's work on an item: edits, confirmed fields, chosen hunt. Ignored once saving or saved. */
   update(id: string, p: Partial<Pick<DumpItem, 'edits' | 'confirmed' | 'huntId'>>) {
@@ -193,10 +215,12 @@ export class DumpQueue {
     if (i && (i.status === 'ready' || i.status === 'review') && !i.saving) this.patch(id, p, 'soon');
   }
   remove(id: string) {
-    if (!this.get(id)) return;
+    const gone = this.get(id);
+    if (!gone) return;
     const t = this.timers.get(id); if (t) { clearTimeout(t); this.timers.delete(id); }
     this.revoke(id);
     this.set({ items: this.state.items.filter(i => i.id !== id) });
+    this.settle(gone.cloudId);
     this.aborts.get(id)?.abort();
     this.enqueue(() => this.deps.store.remove([id]));
   }
@@ -209,7 +233,10 @@ export class DumpQueue {
     if (!i || i.saving || (i.status !== 'ready' && i.status !== 'review')) return false;
     this.patch(id, { saving: true, saveError: undefined }, 'none'); return true;
   }
-  finishSave(id: string, savedId: string) { this.patch(id, { status: 'saved', savedId, saving: false, saveError: undefined }); }
+  finishSave(id: string, savedId: string) {
+    this.patch(id, { status: 'saved', savedId, saving: false, saveError: undefined });
+    this.settle(this.get(id)?.cloudId);
+  }
   failSave(id: string, message: string) { this.patch(id, { saving: false, saveError: message }, 'none'); }
 
   /** Object URL of the uploaded screenshot (for 'show original'). Revoked when the item is removed or the queue is disposed. */
