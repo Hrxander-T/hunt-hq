@@ -4,11 +4,12 @@ import { pretty, sprite, STATS } from './lib';
 import { checkReqs, hiddenPower, ivTotal } from './paste';
 import CaughtRow from './CaughtRow';
 import SubmitCatch from './SubmitCatch';
+import { useBuildMatch } from './useBuildMatch';
 
 interface Props { caught: Caught[]; hunts: Hunt[]; people: Record<string, Profile>; reactions: Reaction[]; me: string; admin: boolean; onChanged: () => void }
 type SortKey = 'date' | 'species' | 'nature' | 'ability' | 'total' | 'level' | 'hp' | 'by' | StatKey;
-interface Filters { who: string; appr: string; nature: string; ability: string; gender: string; hp: string; shiny: boolean; hunt: string; iv: IvReqs }
-const EMPTY: Filters = { who: '', appr: '', nature: '', ability: '', gender: '', hp: '', shiny: false, hunt: '', iv: {} };
+interface Filters { who: string; appr: string; nature: string; ability: string; gender: string; hp: string; shiny: boolean; hunt: string; smg: string; iv: IvReqs }
+const EMPTY: Filters = { who: '', appr: '', nature: '', ability: '', gender: '', hp: '', shiny: false, hunt: '', smg: '', iv: {} };
 const PAGE = 60;
 const SORTS: [SortKey, string][] = [['date', 'Newest'], ['species', 'Pokémon'], ['nature', 'Nature'], ['ability', 'Ability'], ['total', 'Total IVs'],
   ...STATS.map(([k, l]) => [k, `${l} IV`] as [SortKey, string]), ['hp', 'Hidden Power'], ['level', 'Level'], ['by', 'Submitted by']];
@@ -23,6 +24,9 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Caught | undefined>();
+  const [gen, setGen] = useState(() => +(localStorage.getItem('hunt.smogon.gen') ?? 9) || 9);
+  const [minOther, setMinOther] = useState(() => +(localStorage.getItem('hunt.smogon.min') ?? 20) || 20);
+  const sm = useBuildMatch(caught, gen, minOther);
   useEffect(() => setLimit(PAGE), [q, f, sort, grouped]);
 
   const huntById = useMemo(() => new Map(hunts.map(h => [h.id, h])), [hunts]);
@@ -46,6 +50,10 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
       if (f.hp && hiddenPower(c) !== f.hp) return false;
       if (f.shiny && !c.shiny) return false;
       if (target && (c.pokemon_id !== target.pokemon_id || !checkReqs(c, target).ok)) return false;
+      if (f.smg) {
+        const m = sm.results.get(c.id);
+        if (!m || m[0].res.ok !== (f.smg === 'match')) return false; // catches without Smogon sets cannot be judged either way
+      }
       for (const [k, r] of Object.entries(f.iv) as [StatKey, { op: IvOp; v: number }][]) {
         const v = c.ivs?.[k];
         if (v === undefined || !(r.op === 'eq' ? v === r.v : r.op === 'min' ? v >= r.v : v <= r.v)) return false;
@@ -70,7 +78,7 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
       const r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
       return r * sort.dir || +new Date(b.created_at) - +new Date(a.created_at);
     });
-  }, [caught, q, f, sort, people, huntById]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [caught, q, f, sort, people, huntById, sm.results]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const groups = useMemo(() => {
     const m = new Map<number, Caught[]>();
@@ -90,7 +98,7 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
   const finish = () => { setOpen(false); setEdit(undefined); onChanged(); };
   const row = (c: Caught) => (
     <CaughtRow key={c.id} c={c} hunt={c.hunt_id ? huntById.get(c.hunt_id) : undefined} people={people} me={me} admin={admin}
-      reactions={reactions.filter(r => r.caught_id === c.id)} onChanged={onChanged} onEdit={() => setEdit(c)} />
+      reactions={reactions.filter(r => r.caught_id === c.id)} onChanged={onChanged} onEdit={() => setEdit(c)} smogon={sm.results.get(c.id)} smogonGen={gen} />
   );
 
   return (
@@ -121,8 +129,18 @@ export default function CaughtList({ caught, hunts, people, reactions, me, admin
               <select value={f.who} onChange={e => set('who', e.target.value)}><option value="">Everyone</option>{Object.values(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <label className="field"><span className="lbl">Approval</span>
               <select value={f.appr} onChange={e => set('appr', e.target.value)}><option value="">All</option><option value="approved">Approved</option><option value="pending">Pending</option></select></label>
+            <label className="field"><span className="lbl">Smogon build (Gen {gen})</span>
+              <select value={f.smg} onChange={e => set('smg', e.target.value)}><option value="">Any</option><option value="match">Matches a build</option><option value="none">Matches no build</option></select></label>
             <label className="switch"><input type="checkbox" checked={f.shiny} onChange={e => set('shiny', e.target.checked)} /><span className="track" /> Shiny only</label>
           </div>
+          <h4>Compare with Smogon builds</h4>
+          <div className="fgrid">
+            <label className="field"><span className="lbl">Generation</span>
+              <select value={gen} onChange={e => { setGen(+e.target.value); localStorage.setItem('hunt.smogon.gen', e.target.value); }}>{[9, 8, 7, 6, 5, 4, 3].map(g => <option key={g} value={g}>Gen {g}</option>)}</select></label>
+            <label className="field"><span className="lbl">Other IVs at least</span>
+              <input type="number" inputMode="numeric" min={0} max={31} value={minOther} onChange={e => { const n = Math.min(31, Math.max(0, +e.target.value || 0)); setMinOther(n); localStorage.setItem('hunt.smogon.min', String(n)); }} /></label>
+          </div>
+          <p className="muted">A catch matches a build when it has the set's nature and ability, the IVs the set lists, and at least this value in every other stat.{sm.failed ? ' The Smogon data for this generation could not be loaded.' : sm.loading ? ' Checking builds…' : ''}</p>
           <h4>IV conditions</h4>
           <div className="ivgrid">{STATS.map(([k, label]) => {
             const r = f.iv[k];

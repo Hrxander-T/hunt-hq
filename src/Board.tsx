@@ -35,7 +35,7 @@ export default function Board({ me }: { me: string }) {
   const [admin, setAdmin] = useState(false);
   const [panel, setPanel] = useState(false);
   const [profile, setProfile] = useState(false);
-  const [tab, setTab] = useState<'hunts' | 'caught' | 'builds' | 'dump'>('hunts');
+  const [tab, setTab] = useState<'hunts' | 'caught' | 'builds' | 'dump'>(() => new URLSearchParams(location.search).has('shared') ? 'dump' : 'hunts'); // opened from Android's Share menu: go straight to the queue
   const dump = useDumpQueue(me); // lives here, above the tab switch, so screenshots keep being read while another tab is open
   const [grouped, setGrouped] = useState(() => { try { return localStorage.getItem('hunt.group') !== '0'; } catch { return true; } });
   const [view, setView] = useState<'list' | 'cards'>(() => { try { return localStorage.getItem('hunt.view') === 'cards' ? 'cards' : 'list'; } catch { return 'list'; } });

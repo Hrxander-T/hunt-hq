@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Caught, Hunt } from '../types';
 import { loadList, type Entry } from '../lib';
 import { health, readerConfigured } from './readerApi';
-import { firstAttention, itemLabel, MAX_ITEMS, nextAfter, type ItemStatus } from './queue';
+import { captureSupported, startCapture, type CaptureSession } from './capture';
+import { takeShared } from './shared';
+import { firstAttention, itemLabel, MAX_ITEMS, nextAfter, type AddResult, type ItemStatus } from './queue';
 import type { useDumpQueue } from './useDumpQueue';
 import ReviewPane from './ReviewPane';
 
@@ -39,13 +41,14 @@ export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
   useEffect(() => { void checkReader(); }, [checkReader]);
   useEffect(() => { loadList().then(setList).catch(() => toast('Could not load the Pokémon list. Species cannot be checked until it loads.')); }, [toast]);
 
-  const addFiles = useCallback(async (files: File[]) => {
+  const addFiles = useCallback(async (files: File[]): Promise<AddResult | undefined> => {
     const images = files.filter(f => f.type.startsWith('image/'));
     if (images.length < files.length) toast(`Skipped ${files.length - images.length} file(s) that are not images.`);
     if (!images.length) return;
     const r = await q.add(images);
     if (r.duplicates.length) toast(`Already in the queue, skipped: ${r.duplicates.join(', ')}`);
     if (r.rejected.length) toast(`The queue holds at most ${MAX_ITEMS} items. Not added: ${r.rejected.join(', ')}. Save, skip or clear some first.`);
+    return r;
   }, [q, toast]);
 
   useEffect(() => { // Ctrl+V anywhere on this tab. Pasting text into a field is left alone (no image files in it).
@@ -59,6 +62,35 @@ export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [addFiles]);
+
+  // Screenshots sent from Android's Share menu wait in storage until the queue is ready.
+  useEffect(() => {
+    if (!loaded) return;
+    void takeShared().then(files => { if (files.length) void addFiles(files); });
+    if (new URLSearchParams(location.search).has('shared')) history.replaceState(null, '', location.pathname); // so a reload does not look like a new share
+  }, [loaded, addFiles]);
+
+  // ---- Capture button: share the game window once, then one click = one screenshot into the queue ----
+  const [cap, setCap] = useState<CaptureSession | null>(null);
+  const [flash, setFlash] = useState('');
+  const capRef = useRef<CaptureSession | null>(null);
+  const preview = useRef<HTMLVideoElement>(null);
+  const begin = async () => {
+    try {
+      const s = await startCapture(() => { capRef.current = null; setCap(null); }); // the user pressed the browser's "Stop sharing"
+      capRef.current = s; setCap(s);
+    } catch (e) { if ((e as Error).name !== 'NotAllowedError') toast(`Could not start capture: ${(e as Error).message}`); } // NotAllowedError = picker cancelled
+  };
+  const end = () => { capRef.current?.stop(); capRef.current = null; setCap(null); };
+  const shoot = async () => {
+    if (!cap) return;
+    try {
+      const r = await addFiles([await cap.grab()]);
+      if (r && r.added > 0) { setFlash('✓ Sent to the queue'); setTimeout(() => setFlash(''), 2000); }
+    } catch (e) { toast((e as Error).message); }
+  };
+  useEffect(() => () => { capRef.current?.stop(); }, []); // leaving the Dump tab stops sharing
+  useEffect(() => { if (preview.current) preview.current.srcObject = cap?.stream ?? null; }, [cap]);
 
   // Keep something selected: the first item that needs attention (or the first item while everything is still being read).
   useEffect(() => { if (loaded && !items.some(i => i.id === sel)) setSel(firstAttention(items) ?? items[0]?.id ?? ''); }, [loaded, items, sel]);
@@ -74,8 +106,18 @@ export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
         <span className="muted">or paste with Ctrl+V. One screenshot can hold several cards. Up to {MAX_ITEMS} in the queue.</span>
         <div className="row">
           <button className="primary" onClick={() => pick.current?.click()}>Choose screenshots</button>
+          {captureSupported() && !cap && <button onClick={() => void begin()}>Start capture</button>}
           {savedCount > 0 && <button onClick={() => q.clearSaved()}>Clear {savedCount} saved</button>}
         </div>
+        {cap && (
+          <div className="capbar">
+            <video ref={preview} className="capprev" muted autoPlay playsInline />
+            <button className="primary big" onClick={() => void shoot()}>📷 Capture</button>
+            <button onClick={end}>Stop</button>
+            {flash && <span className="okmsg" role="status">{flash}</span>}
+            <span className="muted capnote">Keep the game window visible, not minimized.</span>
+          </div>
+        )}
         <input ref={pick} type="file" accept="image/*" multiple hidden onChange={e => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
         <span className={`rdr ${reader}`} role="status"><i />{READER_TEXT[reader]}{(reader === 'offline' || reader === 'online') && <button className="ghost small" onClick={() => void checkReader()}>Check again</button>}</span>
       </div>

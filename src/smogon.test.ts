@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import sample from './__fixtures__/smogon-sample.json';
-import { buildsFor, consensus, formatInfo, lineItems, mapAbilities, mapAbility, speciesKey, buildNote, itemTally, tally, toRequirements, type GenData } from './smogon';
+import { buildsFor, consensus, formatInfo, lineItems, mapAbilities, mapAbility, speciesKey, buildNote, itemTally, tally, buildPool, matchBuilds, toRequirements, type GenData } from './smogon';
 import type { AbilitySlot } from './lib';
+import { checkReqs } from './paste';
 
 const data = sample as unknown as GenData;
 
@@ -145,5 +146,53 @@ describe('builds tab helpers', () => {
   it('mapAbility ignores apostrophes and hyphens (PokeAPI vs Showdown spelling)', () => {
     const slots: AbilitySlot[] = [{ name: 'Minds Eye', slot: 1, hidden: false }];
     expect(mapAbility("Mind's Eye", slots, slots)).toBe('Minds Eye');
+  });
+});
+
+describe('matching catches to builds', () => {
+  const mdata = {
+    Tyranitar: { ou: {
+      'Dragon Dance': { moves: [['Dragon Dance']], ability: 'Sand Stream', nature: 'Jolly', item: 'Leftovers', evs: { atk: 252, spe: 252, hp: 4 } },
+      'Special': { moves: [['Fire Blast']], ability: 'Sand Stream', nature: 'Modest', evs: { spa: 252 }, ivs: { atk: 0 } },
+    } },
+  } as unknown as GenData;
+  const all31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+  const evo = {
+    own: { species: 'larvitar', abilities: [{ name: 'Guts', slot: 1, hidden: false }, { name: 'Sand Veil', slot: 3, hidden: true }] },
+    later: ['pupitar', 'tyranitar'],
+    src: { tyranitar: { species: 'tyranitar', abilities: [{ name: 'Sand Stream', slot: 1, hidden: false }, { name: 'Unnerve', slot: 3, hidden: true }] } },
+  };
+
+  it('uses the species own sets when it has some', () => {
+    const pool = buildPool(mdata, 'tyranitar');
+    expect(pool.map(p => p.build.name).sort()).toEqual(['Dragon Dance', 'Special']);
+    expect(pool.every(p => p.from === 'tyranitar')).toBe(true);
+  });
+  it('needs evolution info to use a later stage, and translates abilities by slot', () => {
+    expect(buildPool(mdata, 'larvitar')).toEqual([]);
+    const pool = buildPool(mdata, 'larvitar', evo);
+    expect(pool.length).toBe(2);
+    expect(pool.every(p => p.from === 'tyranitar' && p.abilities[0] === 'Guts')).toBe(true);
+  });
+  it('ranks a full match first and counts misses on the others', () => {
+    const res = matchBuilds({ nature: 'Jolly', ability: 'Sand Stream', ivs: all31 }, buildPool(mdata, 'tyranitar'), 20);
+    expect(res[0].build.name).toBe('Dragon Dance');
+    expect(res[0].res.ok).toBe(true);
+    expect(res[1].res.ok).toBe(false);
+    expect(res[1].res.count).toBeGreaterThanOrEqual(2); // wrong nature, and Atk 31 is not the set's 0
+  });
+  it('matches a Larvitar catch against Tyranitar sets using the translated ability', () => {
+    const res = matchBuilds({ nature: 'Jolly', ability: 'Guts', ivs: all31 }, buildPool(mdata, 'larvitar', evo), 20);
+    expect(res[0].res.ok).toBe(true);
+    expect(matchBuilds({ nature: 'Jolly', ability: 'Sand Veil', ivs: all31 }, buildPool(mdata, 'larvitar', evo), 20)[0].res.ok).toBe(false);
+  });
+  it('honours the minimum for stats the set does not list', () => {
+    const low = { ...all31, spe: 10 };
+    expect(matchBuilds({ nature: 'Jolly', ability: 'Sand Stream', ivs: low }, buildPool(mdata, 'tyranitar'), 20)[0].res.ok).toBe(false);
+    expect(matchBuilds({ nature: 'Jolly', ability: 'Sand Stream', ivs: low }, buildPool(mdata, 'tyranitar'), 5)[0].res.ok).toBe(true);
+  });
+  it('checkReqs compares abilities by id, so spelling differences do not count as misses', () => {
+    const h = { natures: [], abilities: ['Minds Eye'], iv_reqs: {}, shiny: false } as unknown as Parameters<typeof checkReqs>[1];
+    expect(checkReqs({ nature: null, ability: "Mind's Eye", shiny: false, ivs: {} }, h).ability).toBe('ok');
   });
 });

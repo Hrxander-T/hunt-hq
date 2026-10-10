@@ -1,5 +1,5 @@
 import type { Caught, Hunt, IvReq, StatKey } from './types';
-import { ivLabel, NATURES, STATS, type Entry } from './lib';
+import { ivLabel, NATURES, STATS, toId, type Entry } from './lib';
 
 type Stats = Partial<Record<StatKey, number>>;
 export interface Parsed {
@@ -82,7 +82,7 @@ export interface ReqResult {
 }
 export function checkReqs(c: Pick<Caught, 'nature' | 'ability' | 'shiny' | 'ivs'>, h: Hunt): ReqResult {
   const misses: string[] = [];
-  const low = (s: string | null) => (s ?? '').toLowerCase();
+  const low = (s: string | null) => toId(s ?? ''); // "Soul-Heart" (Showdown) equals "Soul Heart" (PokeAPI)
   const nature: Mark = !h.natures?.length ? 'na' : h.natures.some(n => low(n) === low(c.nature)) ? 'ok' : 'miss';
   const ability: Mark = !h.abilities?.length ? 'na' : h.abilities.some(a => low(a) === low(c.ability)) ? 'ok' : 'miss';
   const shiny: Mark = !h.shiny ? 'na' : c.shiny ? 'ok' : 'miss';

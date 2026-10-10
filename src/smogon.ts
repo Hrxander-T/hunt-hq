@@ -1,5 +1,7 @@
 import type { IvReqs, StatKey } from './types';
-import { NATURES, STATS, type AbilitySlot } from './lib';
+import { NATURES, STATS, toId, type AbilitySlot, type PokeInfo } from './lib';
+import type { Caught, Hunt } from './types';
+import { checkReqs, type ReqResult } from './paste';
 
 export type Stats = Partial<Record<StatKey, number>>;
 type One<T> = T | T[];
@@ -9,7 +11,7 @@ export interface Manifest { generated: string; gens: Record<string, { bytes: num
 export interface Build { key: string; species: string; format: string; name: string; natures: string[]; abilities: string[]; items: string[]; ivs: Stats; evs: Stats[]; moves: string[][]; tera: string[] }
 
 function arr<T>(v: One<T> | undefined): T[] { return v === undefined ? [] : Array.isArray(v) ? v : [v]; }
-export const toId = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export { toId };
 
 // ---- loading (static files in public/data/smogon, fetched only when needed) ----
 const base = () => `${import.meta.env.BASE_URL}data/smogon/`;
@@ -160,4 +162,36 @@ export const itemTally = (builds: Build[]): Tally[] => tally(builds.flatMap(b =>
 export function buildNote(b: Build, gen: number, who = ''): string {
   const detail = [b.items.join(' / '), evText(b.evs[0])].filter(Boolean).join(', ');
   return `Smogon Gen ${gen} ${who ? who + ' ' : ''}${formatInfo(b.format).label}, ${b.name}${detail ? `: ${detail}` : ''}`;
+}
+
+// ---- matching catches to Smogon builds ----
+// A catch "matches" a build when it meets the same requirements a hunt made from that build would have (see toRequirements):
+// nature, ability, the IVs the set lists exactly, and every other stat at least `minOther` unless the nature lowers it.
+export interface PoolItem { build: Build; from: string; abilities: string[] }
+export interface BuildMatch extends PoolItem { res: ReqResult }
+export interface EvoInfo { own: PokeInfo; later: string[]; src: Record<string, PokeInfo> }
+
+// The builds a catch of `species` is compared with: its own default-format sets, or, when it has none, the sets of its later
+// evolution stages (Larvitar uses Tyranitar's) with abilities translated by slot. `evo` is only needed for the second case.
+export function buildPool(data: GenData, species: string, evo?: EvoInfo): PoolItem[] {
+  const shown = (b: Build) => DEFAULT_GROUPS.has(formatInfo(b.format).group);
+  const own = buildsFor(data, species).filter(shown);
+  if (own.length) return own.map(b => ({ build: b, from: species, abilities: b.abilities }));
+  if (!evo) return [];
+  const out: PoolItem[] = [];
+  for (const it of lineItems(data, species, evo.later)) {
+    if (it.poke === species) continue;
+    const src = evo.src[it.poke];
+    if (!src) continue;
+    for (const b of buildsForKey(data, it.key).filter(shown)) out.push({ build: b, from: it.poke, abilities: mapAbilities(b.abilities, src.abilities, evo.own.abilities) });
+  }
+  return out;
+}
+
+// Best match first: fewest misses, then format order, then set name.
+export function matchBuilds(c: Pick<Caught, 'nature' | 'ability' | 'ivs'>, pool: PoolItem[], minOther: number): BuildMatch[] {
+  return pool.map(p => {
+    const h = { natures: p.build.natures, abilities: p.abilities, shiny: false, iv_reqs: toRequirements(p.build.natures, p.build.ivs, minOther) } as unknown as Hunt;
+    return { ...p, res: checkReqs({ nature: c.nature, ability: c.ability, shiny: false, ivs: c.ivs }, h) };
+  }).sort((a, b) => a.res.count - b.res.count || formatInfo(a.build.format).order - formatInfo(b.build.format).order || a.build.name.localeCompare(b.build.name));
 }

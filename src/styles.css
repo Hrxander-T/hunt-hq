@@ -347,3 +347,17 @@ code{background:var(--card);padding:1px 6px;border-radius:6px}
   .dimg{position:static}.dimg .crop{max-height:340px}
 }
 .tabs{max-width:600px}
+
+/* Caught: Smogon build matches */
+.nm small.smg{color:var(--ok);font-weight:800}
+.smgm{display:grid;gap:8px}
+.smgl{display:flex;flex-wrap:wrap;gap:6px}
+.smgb{display:inline-flex;gap:8px;align-items:center;min-height:34px;padding:4px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font-size:.82rem;font-weight:700;text-align:left}
+.smgb small{font-weight:800}
+.smgb.ok{border-color:var(--ok)}.smgb.ok small{color:var(--ok)}
+.smgb.bad small{color:var(--bad)}
+.smgb.on{box-shadow:0 0 0 2px var(--brand);border-color:var(--brand)}
+.capbar{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.capprev{width:160px;max-height:90px;border-radius:8px;background:#000;object-fit:contain}
+.capnote{flex-basis:100%;font-size:.8rem}
+.big{min-height:52px;padding:8px 22px;font-size:1.05rem}

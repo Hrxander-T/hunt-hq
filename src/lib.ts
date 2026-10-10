@@ -84,3 +84,6 @@ export async function laterStages(species: string): Promise<string[]> {
   try { localStorage.setItem(key, JSON.stringify(out)); } catch { /* ignore */ }
   return out;
 }
+
+// Lowercase letters and digits only: "Mind's Eye" (Showdown) and "Minds Eye" (PokeAPI) compare equal.
+export const toId = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');

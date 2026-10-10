@@ -5,14 +5,17 @@ import { ivLabel, pretty, sprite, STATS, TYPE_COLORS } from './lib';
 import { checkReqs, hiddenPower, ivTotal } from './paste';
 import Avatar from './Avatar';
 import ReqMatch, { ReqSummary } from './ReqMatch';
+import SmogonMatch, { matchLabel } from './SmogonMatch';
+import type { BuildMatch } from './smogon';
 
 const KINDS: [string, string][] = [['congrats', 'Congrats'], ['ivs', 'Great IVs'], ['wow', 'Wow']];
 export interface RowProps {
   c: Caught; hunt?: Hunt; people: Record<string, Profile>; me: string; admin: boolean; reactions: Reaction[];
   onChanged: () => void; onEdit: () => void;
+  smogon?: BuildMatch[]; smogonGen: number;
 }
 
-export default function CaughtRow({ c, hunt, people, me, admin, reactions, onChanged, onEdit }: RowProps) {
+export default function CaughtRow({ c, hunt, people, me, admin, reactions, onChanged, onEdit, smogon, smogonGen }: RowProps) {
   const [open, setOpen] = useState(false);
   const [armed, setArmed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -22,6 +25,7 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
   const canApprove = admin && (c.approved || !!chk?.ok);
   const canEdit = c.caught_by === me || admin;
   const hp = hiddenPower(c);
+  const fits = (smogon ?? []).filter(m => m.res.ok);
   const hasIvReqs = !!chk && Object.keys(chk.stats).length > 0;
   const run = async (p: PromiseLike<{ error: { message: string } | null }>) => { const { error } = await p; if (error) setErr(error.message); else { setErr(''); onChanged(); } };
   const toggle = (kind: string) => {
@@ -35,7 +39,7 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
     <div className={`crow${open ? ' open' : ''}`} style={{ '--tint': TYPE_COLORS[c.types[0]] ?? 'var(--line)' } as CSSProperties}>
       <button className="rowmain" aria-expanded={open} onClick={() => setOpen(!open)}>
         <img className="spr" src={sprite(c.pokemon_id, c.shiny)} alt="" loading="lazy" decoding="async" />
-        <span className="nm"><b>{pretty(c.species)}</b><small>{[c.nickname, c.level && `Lv ${c.level}`, c.shiny && 'Shiny'].filter(Boolean).join(' · ')}</small></span>
+        <span className="nm"><b>{pretty(c.species)}</b><small>{[c.nickname, c.level && `Lv ${c.level}`, c.shiny && 'Shiny'].filter(Boolean).join(' · ')}</small>{fits.length > 0 && <small className="smg" title="Meets the nature, ability and IV requirements of this Smogon set">Matches {matchLabel(fits[0])}{fits.length > 1 && ` +${fits.length - 1}`}</small>}</span>
         <span className={`gd ${c.gender ?? ''}`}>{c.gender ?? ''}</span>
         <span className={`nat${chk?.nature === 'ok' ? ' rok' : chk?.nature === 'miss' ? ' rbad' : ''}`}>{c.nature ?? '-'}</span>
         <span className={`abl${chk?.ability === 'ok' ? ' rok' : chk?.ability === 'miss' ? ' rbad' : ''}`}>{c.ability ?? '-'}</span>
@@ -57,6 +61,7 @@ export default function CaughtRow({ c, hunt, people, me, admin, reactions, onCha
           <div className="dgrid">
             <div><span className="lbl">Submitted by</span><span className="who">{owner && <Avatar name={owner.name} size={20} />}{owner?.name ?? 'Unknown'} · {new Date(c.created_at).toLocaleDateString()}</span></div>
             {hunt && chk && <div className="span2"><span className="lbl">Linked hunt: {pretty(hunt.name)} <ReqSummary r={chk} /></span><ReqMatch c={c} h={hunt} r={chk} /></div>}
+            {smogon && smogon.length > 0 && <div className="span2"><SmogonMatch c={c} matches={smogon} gen={smogonGen} /></div>}
             <div><span className="lbl">React</span>
               <span className="reacts">{KINDS.map(([k, label]) => {
                 const n = reactions.filter(r => r.kind === k).length, mine = reactions.some(r => r.user_id === me && r.kind === k);

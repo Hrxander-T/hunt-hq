@@ -71,3 +71,14 @@ The reader API is currently open: anyone who finds its URL can use the owner's P
    fallback reader can take over a minute.
 3. `VITE_READER_API_KEY` exists for local development only. Anything in a `VITE_` variable is public in the built JavaScript,
    so never put a real key there for production.
+
+### Adding screenshots without dragging files
+
+- **Capture button (computer):** in the Dump tab, **Start capture**, pick the game window once, then **📷 Capture** sends one
+  screenshot to the queue. Chrome, Edge or Firefox on a computer. Keep the game window visible.
+- **Share from Android:** install Hunt HQ from Chrome (menu > **Install app**, not just a shortcut), then take a normal
+  screenshot, tap **Share**, pick **Hunt HQ**. It opens on the Dump tab with the screenshot in the queue.
+  - Needs the deployed https site served from the domain root. It does not work on `npm run dev`.
+  - The service worker (`public/sw.js`) is registered only in production builds. It only handles the share, nothing else.
+  - If Hunt HQ is missing from the Share menu after installing, uninstall and install again so Android re-reads the manifest.
+  - Icons are drawn by `python3 scripts/make-icons.py` (no dependencies).
