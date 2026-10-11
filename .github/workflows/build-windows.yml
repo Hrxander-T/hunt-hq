@@ -5,6 +5,9 @@ on:
   push:
     tags: ['desktop-v*']  # or push a tag like desktop-v1.0
 
+permissions:
+  contents: write         # needed to upload to the "apps" release
+
 jobs:
   build:
     runs-on: windows-latest
@@ -26,3 +29,10 @@ jobs:
           name: HuntHQCapture-windows
           path: desktop/dist/HuntHQCapture.exe
           if-no-files-found: error
+      - name: Publish to the apps release
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view apps || gh release create apps --title "App downloads" --notes "Latest capture apps."
+          gh release upload apps dist/HuntHQCapture.exe --clobber

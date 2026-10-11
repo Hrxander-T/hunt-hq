@@ -1,7 +1,14 @@
 export type Platform = 'android' | 'windows' | 'linux' | 'other';
 export interface AppFile { id: Exclude<Platform, 'other'>; label: string; file: string; note: string }
 
-// File names inside the private Supabase Storage bucket "apps" (see supabase/migration-apps.sql).
+// Downloads live in one public GitHub release tagged "apps".
+// Upload each file with exactly the name below (see desktop/README.md).
+export const RELEASE_BASE = 'https://github.com/Hrxander-T/hunt-hq/releases/download/apps/';
+
+export function downloadUrl(file: string): string {
+  return RELEASE_BASE + file;
+}
+
 export const APP_FILES: AppFile[] = [
   { id: 'android', label: 'Android', file: 'HuntHQ-Capture.apk', note: 'Floating capture button. When asked, allow installing from this browser.' },
   { id: 'windows', label: 'Windows', file: 'HuntHQCapture.exe', note: 'Tray app, press F9 in the game. Needs a config.json next to it with the upload token.' },
