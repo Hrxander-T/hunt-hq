@@ -1,0 +1,7 @@
+supabase/
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.apk

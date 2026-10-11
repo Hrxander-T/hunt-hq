@@ -7,6 +7,7 @@ import { takeShared } from './shared';
 import { firstAttention, itemLabel, MAX_ITEMS, nextAfter, type AddResult, type ItemStatus } from './queue';
 import type { useDumpQueue } from './useDumpQueue';
 import ReviewPane from './ReviewPane';
+import GetApps from './GetApps';
 
 type Dump = ReturnType<typeof useDumpQueue>;
 interface Props { dump: Dump; hunts: Hunt[]; caught: Caught[]; me: string; onChanged: () => void }
@@ -122,6 +123,7 @@ export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
         <span className={`rdr ${reader}`} role="status"><i />{READER_TEXT[reader]}{(reader === 'offline' || reader === 'online') && <button className="ghost small" onClick={() => void checkReader()}>Check again</button>}</span>
       </div>
 
+      <GetApps />
       {persistFailed && <p className="warn">This browser could not keep your queue (private window or full storage). Save everything before closing or reloading the page.</p>}
       {toasts.map(t => <p key={t.id} className="warn toast" role="status" onClick={() => setToasts(a => a.filter(x => x.id !== t.id))}>{t.text}</p>)}
       <datalist id="dump-species">{list.map(s => <option key={s.id} value={s.name} />)}</datalist>

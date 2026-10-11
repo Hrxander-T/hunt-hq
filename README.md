@@ -82,3 +82,20 @@ The reader API is currently open: anyone who finds its URL can use the owner's P
   - The service worker (`public/sw.js`) is registered only in production builds. It only handles the share, nothing else.
   - If Hunt HQ is missing from the Share menu after installing, uninstall and install again so Android re-reads the manifest.
   - Icons are drawn by `python3 scripts/make-icons.py` (no dependencies).
+- **Android capture app (floating button):** the separate app in `../hunt-hq-android`. A 📷 button floats over the game;
+  one tap uploads a screenshot to Cloudinary and adds a row to `pending_shots` in Supabase. Hunt HQ pulls those into the
+  Dump queue by itself (when the app opens, every 30 seconds, and when you come back to the page, on any tab) and the
+  reader reads them like any other screenshot. When every card of a screenshot is saved, skipped or removed, the
+  picture is deleted from Cloudinary and its row from `pending_shots` (edge function `delete-shots`, the only place that
+  holds the Cloudinary secret). Code: `src/dump/pending.ts`, `src/dump/useDumpQueue.ts`, `cloudId` in `src/dump/queue.ts`.
+  - **One-time setup:**
+    1. Cloudinary: Settings > Upload > Upload presets, new preset `hunt_pending`, signing mode **Unsigned**, asset folder `pending`.
+    2. Supabase SQL Editor: run `supabase/migration-pending.sql`.
+    3. Secrets (run in this folder, any value for the token, keep it): `npx supabase secrets set INGEST_TOKEN=... CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=...`
+    4. Deploy: `npx supabase functions deploy ingest-shot --no-verify-jwt` and `npx supabase functions deploy delete-shots`.
+    5. Put the same token in `../hunt-hq-android/local.properties` as `ingestToken=...`, then build the app (see its README).
+  - **One shared list for the whole team.** Whoever has Hunt HQ open first claims a new screenshot; everyone's
+    screenshots land with whoever reviews them. A per-person list would need one token per person.
+  - The reader must be running (`VITE_READER_URL`) for the pictures to be read. Until then they wait in the queue.
+  - Pictures nobody ever reviews stay in Cloudinary. There is no automatic expiry yet; delete them in the Media Library
+    and remove their rows from `pending_shots`.

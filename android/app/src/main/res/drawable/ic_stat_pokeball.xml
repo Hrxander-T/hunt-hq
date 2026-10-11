@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pokeball outline for the status bar (Android only uses the shape, in one colour). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4" android:pathData="M24,5a19,19 0 1 0 0,38a19,19 0 1 0 0,-38z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M5,22h38v4H5z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4" android:pathData="M24,17a7,7 0 1 0 0,14a7,7 0 1 0 0,-14z" />
+</vector>
