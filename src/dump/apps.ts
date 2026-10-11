@@ -11,8 +11,8 @@ export function downloadUrl(file: string): string {
 
 export const APP_FILES: AppFile[] = [
   { id: 'android', label: 'Android', file: 'HuntHQ-Capture.apk', note: 'Floating capture button. When asked, allow installing from this browser.' },
-  { id: 'windows', label: 'Windows', file: 'HuntHQCapture.exe', note: 'Tray app, press F9 in the game. Needs a config.json next to it with the upload token.' },
-  { id: 'linux', label: 'Linux', file: 'HuntHQCapture-linux.tar.gz', note: 'Tray app, press F9 in the game. X11 only. Needs a config.json next to it with the upload token.' },
+  { id: 'windows', label: 'Windows', file: 'HuntHQCapture.exe', note: 'Tray app, press F9 in the game.' },
+  { id: 'linux', label: 'Linux', file: 'HuntHQCapture-linux.tar.gz', note: 'Tray app, press F9 in the game. X11 only.' },
 ];
 
 export function detectPlatform(ua: string): Platform {

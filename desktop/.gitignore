@@ -1,4 +1,5 @@
 config.json
+hunt_capture/_token.py
 .venv/
 __pycache__/
 *.pyc

@@ -20,8 +20,18 @@ const READER_TEXT: Record<Reader, string> = {
 };
 let toastId = 0;
 
+/** "New shots check in 12s" plus a button to check right now. */
+function PhoneSync({ nextAt, checking, onCheck }: { nextAt: number; checking: boolean; onCheck: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const left = Math.max(0, Math.ceil((nextAt - now) / 1000));
+  return (
+    <span className="rdr online" role="status"><i />{checking ? 'Checking for new shots…' : `New shots check in ${left}s`}<button className="ghost small" disabled={checking} onClick={onCheck}>Check now</button></span>
+  );
+}
+
 export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
-  const { q, items, loaded, persistFailed } = dump;
+  const { q, items, loaded, persistFailed, nextCheckAt, checking, checkNow } = dump;
   const [list, setList] = useState<Entry[]>([]);
   const [sel, setSel] = useState('');
   const [over, setOver] = useState(false);
@@ -121,6 +131,7 @@ export default function DumpTab({ dump, hunts, caught, me, onChanged }: Props) {
         )}
         <input ref={pick} type="file" accept="image/*" multiple hidden onChange={e => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
         <span className={`rdr ${reader}`} role="status"><i />{READER_TEXT[reader]}{(reader === 'offline' || reader === 'online') && <button className="ghost small" onClick={() => void checkReader()}>Check again</button>}</span>
+        {loaded && <PhoneSync nextAt={nextCheckAt} checking={checking} onCheck={checkNow} />}
       </div>
 
       <GetApps />

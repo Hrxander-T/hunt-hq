@@ -27,6 +27,7 @@ export interface QueueDeps {
   read(file: File, signal: AbortSignal): Promise<ReaderCard[]>;
   store: QueueStore; hash(file: File): Promise<string>; uid(): string; now(): number;
   release?(cloudId: string): Promise<boolean>; // deletes the cloud copy of a phone screenshot; true = done, false = try again later
+  addImages?(file: File, cards: ReaderCard[]): Promise<ReaderCard[]>; // cuts the card pictures for results that were read in the background (they come without pictures)
 }
 
 export async function sha256Hex(file: Blob): Promise<string> {
@@ -122,8 +123,9 @@ export class DumpQueue {
   }
 
   // ---- adding ----
-  add(files: File[], cloudIds?: (string | undefined)[]): Promise<AddResult> {
-    const p = this.addChain.then(() => this.doAdd(files, cloudIds));
+  /** `preread[k]` = cards already read in the background for files[k]: that item skips the browser read and shows up ready at once. */
+  add(files: File[], cloudIds?: (string | undefined)[], preread?: (ReaderCard[] | undefined)[]): Promise<AddResult> {
+    const p = this.addChain.then(() => this.doAdd(files, cloudIds, preread));
     this.addChain = p.catch(() => undefined);
     return p;
   }
@@ -140,11 +142,13 @@ export class DumpQueue {
     if (this.state.items.some(i => i.cloudId === cloudId && i.status !== 'saved' && i.status !== 'skipped')) return;
     this.release(cloudId);
   }
-  private async doAdd(files: File[], cloudIds?: (string | undefined)[]): Promise<AddResult> {
+  private async doAdd(files: File[], cloudIds?: (string | undefined)[], preread?: (ReaderCard[] | undefined)[]): Promise<AddResult> {
     await this.loadP;
     const res: AddResult = { added: 0, duplicates: [], rejected: [] };
     for (const [k, f] of files.entries()) {
       const hash = await this.deps.hash(f);
+      let pre = preread?.[k];
+      if (pre?.length && this.deps.addImages) { try { pre = await this.deps.addImages(f, pre); } catch { pre = undefined; } } // no picture, no shortcut: the browser reads it instead
       const items = this.state.items;
       const cloudId = cloudIds?.[k];
       const same = items.find(i => i.hash === hash);
@@ -155,9 +159,11 @@ export class DumpQueue {
       }
       if (items.length >= MAX_ITEMS) { res.rejected.push(f.name); continue; }
       const order = Math.floor(Math.max(0, ...items.map(i => i.order))) + 1;
-      const item: DumpItem = { id: this.deps.uid(), hash, name: f.name, blob: f, createdAt: this.deps.now(), order, status: 'queued', cardIndex: 0, cardCount: 1, confirmed: [], cloudId };
-      this.set({ items: [...items, item] }); this.save(item.id);
-      res.added++; this.pump();
+      const item: DumpItem = { id: this.deps.uid(), hash, name: f.name, blob: f, createdAt: this.deps.now(), order, status: pre?.length ? 'reading' : 'queued', cardIndex: 0, cardCount: 1, confirmed: [], cloudId };
+      this.set({ items: [...items, item] });
+      if (pre?.length) this.apply(item.id, pre); // apply() turns it into one item per card and saves them
+      else { this.save(item.id); this.pump(); }
+      res.added++;
     }
     return res;
   }

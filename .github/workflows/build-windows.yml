@@ -19,6 +19,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Put the upload token inside the exe
+        shell: pwsh
+        env:
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+        run: |
+          if (-not $env:INGEST_TOKEN) { throw 'Add the GitHub secret INGEST_TOKEN first.' }
+          "TOKEN = '$($env:INGEST_TOKEN)'" | Out-File -Encoding ascii hunt_capture/_token.py
       - name: Build
         shell: cmd
         run: |

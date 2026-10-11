@@ -4,3 +4,4 @@ dist
 *.tsbuildinfo
 DUMP_TAB_PLAN.md
 .vitest/
+.apk

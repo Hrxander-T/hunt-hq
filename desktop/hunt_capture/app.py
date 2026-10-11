@@ -1,4 +1,5 @@
 """Tray app: press the hotkey, the game window is captured and sent to Hunt HQ's Dump queue."""
+import socket
 import threading
 import time
 
@@ -9,6 +10,16 @@ from pynput import keyboard
 from . import config, grab, uploader
 
 _busy = threading.Lock()
+
+
+def log(msg: str) -> None:
+    """Also written to ~/.hunt-hq-capture/log.txt, because the packaged app has no console."""
+    try:
+        config.SHOTS_DIR.parent.mkdir(parents=True, exist_ok=True)
+        with open(config.SHOTS_DIR.parent / "log.txt", "a", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + msg + "\n")
+    except Exception:
+        pass
 
 
 def _icon_image() -> Image.Image:
@@ -26,13 +37,31 @@ def _icon_image() -> Image.Image:
     return img.resize((64, 64), Image.LANCZOS)
 
 
+def _single_instance():
+    """Only one copy may run: a second copy would fire on every hotkey press too. Returns the socket to keep, or None."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 47653))
+        s.listen(1)
+    except OSError:
+        s.close()
+        return None
+    return s
+
+
 def main() -> None:
+    lock = _single_instance()  # keep this name alive for the whole run
+    if lock is None:
+        log("Another Hunt HQ Capture is already running. Closing this copy.")
+        print("Another Hunt HQ Capture is already running.", flush=True)
+        return
     cfg = config.load()
     config.SHOTS_DIR.mkdir(parents=True, exist_ok=True)
     grab.init()
     icon = pystray.Icon("hunt-hq", _icon_image(), "Hunt HQ Capture")
 
     def say(msg: str) -> None:
+        log(msg)
         print(msg, flush=True)
         try:
             icon.notify(msg, "Hunt HQ")
@@ -47,10 +76,13 @@ def main() -> None:
             say(f"Sent {sent} to Hunt HQ")
 
     def capture() -> None:
+        log("hotkey/menu: capture requested")
         if not _busy.acquire(blocking=False):
+            log("capture skipped: still busy with the last one")
             return
         try:
             img = grab.grab(cfg["window_title"])
+            log(f"grabbed a picture {img.size}")
             img.save(config.SHOTS_DIR / f"shot-{int(time.time() * 1000)}.png")
             do_upload()
         except grab.GrabError as e:
@@ -80,5 +112,6 @@ def main() -> None:
     )
     if not cfg["ingest_token"]:
         print("WARNING: no ingest token. See README.", flush=True)
+    log(f"Running. Hotkey {cfg['hotkey']}, window '{cfg['window_title']}', token {'set' if cfg['ingest_token'] else 'MISSING'}.")
     print(f"Running. Hotkey {cfg['hotkey']}, window '{cfg['window_title']}'.", flush=True)
     icon.run()

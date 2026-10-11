@@ -20,11 +20,19 @@ def _token_from_android() -> str:
     return ""
 
 
+def _embedded_token() -> str:
+    try:
+        from . import _token  # written at build time (build_linux.sh / GitHub Actions); not in git
+        return str(_token.TOKEN).strip()
+    except Exception:
+        return ""
+
+
 def load() -> dict:
     cfg = dict(DEFAULTS)
     p = ROOT / "config.json"
     if p.exists():
         cfg.update(json.loads(p.read_text(encoding="utf-8")))
-    tok = os.environ.get("HUNT_INGEST_TOKEN") or cfg.get("ingest_token") or _token_from_android()
+    tok = os.environ.get("HUNT_INGEST_TOKEN") or cfg.get("ingest_token") or _embedded_token() or _token_from_android()
     cfg["ingest_token"] = (tok or "").strip()
     return cfg
